@@ -1,5 +1,7 @@
 import { mapFrequencyBands, smoothBars } from './audio/processor.js';
 import { SegmentedLED } from './visualizers/segmented-led.js';
+import { NeonGlow } from './visualizers/neon-glow.js';
+import { Mirrored } from './visualizers/mirrored.js';
 
 const canvas = document.getElementById('visualizer');
 const ctx = canvas.getContext('2d');
@@ -92,5 +94,7 @@ export function updateSettings(newSettings) {
 }
 
 registerVisualizer('segmented-led', new SegmentedLED());
+registerVisualizer('neon-glow', new NeonGlow());
+registerVisualizer('mirrored', new Mirrored());
 setVisualizer('segmented-led');
 render();
