@@ -50,8 +50,9 @@ static void fft(std::vector<Complex>& a) {
 
 WasapiCapture::WasapiCapture()
     : running_(false), beat_(false), volume_(0.0f),
-      sampleRate_(44100), bassAvg_(0.0) {
-  magnitudes_.resize(FFT_SIZE / 2, 0.0f);
+      sampleRate_(44100), bassAvg_(0.0), rawBufferSize_(0) {
+  midMagnitudes_.resize(FFT_SIZE / 2, 0.0f);
+  sideMagnitudes_.resize(FFT_SIZE / 2, 0.0f);
   lastBeatTime_ = std::chrono::steady_clock::now();
 }
 
@@ -69,9 +70,24 @@ void WasapiCapture::stop() {
   if (captureThread_.joinable()) captureThread_.join();
 }
 
-std::vector<float> WasapiCapture::getMagnitudes() {
+std::vector<float> WasapiCapture::getMidMagnitudes() {
   std::lock_guard<std::mutex> lock(dataMutex_);
-  return magnitudes_;
+  return midMagnitudes_;
+}
+
+std::vector<float> WasapiCapture::getSideMagnitudes() {
+  std::lock_guard<std::mutex> lock(dataMutex_);
+  return sideMagnitudes_;
+}
+
+std::vector<float> WasapiCapture::getRawLeft() {
+  std::lock_guard<std::mutex> lock(dataMutex_);
+  return rawLeft_;
+}
+
+std::vector<float> WasapiCapture::getRawRight() {
+  std::lock_guard<std::mutex> lock(dataMutex_);
+  return rawRight_;
 }
 
 bool WasapiCapture::getBeat() {
@@ -87,6 +103,58 @@ float WasapiCapture::getVolume() {
 }
 
 int WasapiCapture::getSampleRate() { return sampleRate_; }
+
+std::vector<float> WasapiCapture::computeFFT(const std::vector<float>& samples) {
+  std::vector<Complex> data(FFT_SIZE);
+  for (int i = 0; i < FFT_SIZE; i++) {
+    double window = 0.5 * (1.0 - cos(2.0 * M_PI * i / (FFT_SIZE - 1)));
+    data[i] = Complex(samples[i] * window, 0);
+  }
+
+  fft(data);
+
+  std::vector<float> mags(FFT_SIZE / 2);
+  for (int i = 0; i < FFT_SIZE / 2; i++) {
+    mags[i] = (float)(sqrt(data[i].re * data[i].re +
+                            data[i].im * data[i].im) / FFT_SIZE);
+  }
+  return mags;
+}
+
+void WasapiCapture::processAudio(const std::vector<float>& midSamples, const std::vector<float>& sideSamples) {
+  auto midMags = computeFFT(midSamples);
+  auto sideMags = computeFFT(sideSamples);
+
+  // RMS volume from mid channel
+  float rmsSum = 0;
+  for (int i = 0; i < FFT_SIZE; i++) rmsSum += midSamples[i] * midSamples[i];
+  float rms = sqrtf(rmsSum / FFT_SIZE);
+
+  // Beat detection on mid channel bass energy (20-200Hz)
+  float binRes = (float)sampleRate_ / FFT_SIZE;
+  int bassStart = std::max(1, (int)(20.0f / binRes));
+  int bassEnd = std::min(FFT_SIZE / 2, (int)(200.0f / binRes));
+  float bassEnergy = 0;
+  for (int i = bassStart; i <= bassEnd; i++) bassEnergy += midMags[i];
+
+  float alpha = 0.05f;
+  bassAvg_ = alpha * bassEnergy + (1.0f - alpha) * bassAvg_;
+
+  bool beatDetected = false;
+  auto now = std::chrono::steady_clock::now();
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     now - lastBeatTime_).count();
+  if (bassEnergy > bassAvg_ * 1.5f && elapsed > 100) {
+    beatDetected = true;
+    lastBeatTime_ = now;
+  }
+
+  std::lock_guard<std::mutex> lock(dataMutex_);
+  midMagnitudes_ = midMags;
+  sideMagnitudes_ = sideMags;
+  beat_ = beatDetected || beat_;
+  volume_ = rms;
+}
 
 void WasapiCapture::captureLoop() {
   HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -127,8 +195,13 @@ void WasapiCapture::captureLoop() {
   if (FAILED(hr)) goto cleanup;
 
   {
-    std::vector<float> sampleBuffer;
-    sampleBuffer.reserve(FFT_SIZE * 2);
+    std::vector<float> midBuffer;
+    std::vector<float> sideBuffer;
+    std::vector<float> leftBuf;
+    std::vector<float> rightBuf;
+    midBuffer.reserve(FFT_SIZE * 2);
+    sideBuffer.reserve(FFT_SIZE * 2);
+    rawBufferSize_ = sampleRate_ * RAW_BUFFER_SECONDS;
     int channels = format->nChannels;
     int bitsPerSample = format->wBitsPerSample;
 
@@ -149,24 +222,32 @@ void WasapiCapture::captureLoop() {
         if (FAILED(hr)) break;
 
         if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
-          for (UINT32 i = 0; i < numFrames; i++)
-            sampleBuffer.push_back(0.0f);
+          for (UINT32 i = 0; i < numFrames; i++) {
+            midBuffer.push_back(0.0f);
+            sideBuffer.push_back(0.0f);
+            leftBuf.push_back(0.0f);
+            rightBuf.push_back(0.0f);
+          }
         } else if (data) {
           if (bitsPerSample == 32) {
             float* samples = (float*)data;
             for (UINT32 i = 0; i < numFrames; i++) {
-              float mono = 0;
-              for (int ch = 0; ch < channels; ch++)
-                mono += samples[i * channels + ch];
-              sampleBuffer.push_back(mono / channels);
+              float left = samples[i * channels];
+              float right = channels > 1 ? samples[i * channels + 1] : left;
+              midBuffer.push_back((left + right) / 2.0f);
+              sideBuffer.push_back((left - right) / 2.0f);
+              leftBuf.push_back(left);
+              rightBuf.push_back(right);
             }
           } else if (bitsPerSample == 16) {
             short* samples = (short*)data;
             for (UINT32 i = 0; i < numFrames; i++) {
-              float mono = 0;
-              for (int ch = 0; ch < channels; ch++)
-                mono += samples[i * channels + ch] / 32768.0f;
-              sampleBuffer.push_back(mono / channels);
+              float left = samples[i * channels] / 32768.0f;
+              float right = channels > 1 ? samples[i * channels + 1] / 32768.0f : left;
+              midBuffer.push_back((left + right) / 2.0f);
+              sideBuffer.push_back((left - right) / 2.0f);
+              leftBuf.push_back(left);
+              rightBuf.push_back(right);
             }
           }
         }
@@ -176,11 +257,24 @@ void WasapiCapture::captureLoop() {
         if (FAILED(hr)) break;
       }
 
-      while ((int)sampleBuffer.size() >= FFT_SIZE) {
-        processFFT(sampleBuffer);
-        sampleBuffer.erase(sampleBuffer.begin(),
-                           sampleBuffer.begin() + FFT_SIZE);
+      while ((int)midBuffer.size() >= FFT_SIZE && (int)sideBuffer.size() >= FFT_SIZE) {
+        processAudio(midBuffer, sideBuffer);
+        midBuffer.erase(midBuffer.begin(), midBuffer.begin() + FFT_SIZE);
+        sideBuffer.erase(sideBuffer.begin(), sideBuffer.begin() + FFT_SIZE);
       }
+
+      // Update raw L/R circular buffer
+      {
+        std::lock_guard<std::mutex> lock(dataMutex_);
+        rawLeft_.insert(rawLeft_.end(), leftBuf.begin(), leftBuf.end());
+        rawRight_.insert(rawRight_.end(), rightBuf.begin(), rightBuf.end());
+        if ((int)rawLeft_.size() > rawBufferSize_) {
+          rawLeft_.erase(rawLeft_.begin(), rawLeft_.end() - rawBufferSize_);
+          rawRight_.erase(rawRight_.begin(), rawRight_.end() - rawBufferSize_);
+        }
+      }
+      leftBuf.clear();
+      rightBuf.clear();
     }
   }
 
@@ -193,49 +287,4 @@ cleanup:
   if (device) device->Release();
   if (enumerator) enumerator->Release();
   CoUninitialize();
-}
-
-void WasapiCapture::processFFT(const std::vector<float>& samples) {
-  std::vector<Complex> data(FFT_SIZE);
-  float rmsSum = 0;
-
-  for (int i = 0; i < FFT_SIZE; i++) {
-    double window = 0.5 * (1.0 - cos(2.0 * M_PI * i / (FFT_SIZE - 1)));
-    data[i] = Complex(samples[i] * window, 0);
-    rmsSum += samples[i] * samples[i];
-  }
-
-  fft(data);
-
-  std::vector<float> mags(FFT_SIZE / 2);
-  for (int i = 0; i < FFT_SIZE / 2; i++) {
-    mags[i] = (float)(sqrt(data[i].re * data[i].re +
-                            data[i].im * data[i].im) / FFT_SIZE);
-  }
-
-  // Beat detection: bass energy (20-200Hz)
-  float binRes = (float)sampleRate_ / FFT_SIZE;
-  int bassStart = std::max(1, (int)(20.0f / binRes));
-  int bassEnd = std::min(FFT_SIZE / 2, (int)(200.0f / binRes));
-  float bassEnergy = 0;
-  for (int i = bassStart; i <= bassEnd; i++) bassEnergy += mags[i];
-
-  float alpha = 0.05f;
-  bassAvg_ = alpha * bassEnergy + (1.0f - alpha) * bassAvg_;
-
-  bool beatDetected = false;
-  auto now = std::chrono::steady_clock::now();
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                     now - lastBeatTime_).count();
-  if (bassEnergy > bassAvg_ * 1.5f && elapsed > 100) {
-    beatDetected = true;
-    lastBeatTime_ = now;
-  }
-
-  float rms = sqrtf(rmsSum / FFT_SIZE);
-
-  std::lock_guard<std::mutex> lock(dataMutex_);
-  magnitudes_ = mags;
-  beat_ = beatDetected || beat_;
-  volume_ = rms;
 }

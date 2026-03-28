@@ -14,6 +14,7 @@
 class WasapiCapture {
 public:
   static const int FFT_SIZE = 2048;
+  static const int RAW_BUFFER_SECONDS = 7;
 
   WasapiCapture();
   ~WasapiCapture();
@@ -21,20 +22,28 @@ public:
   bool start();
   void stop();
 
-  std::vector<float> getMagnitudes();
+  std::vector<float> getMidMagnitudes();
+  std::vector<float> getSideMagnitudes();
+  std::vector<float> getRawLeft();
+  std::vector<float> getRawRight();
   bool getBeat();
   float getVolume();
   int getSampleRate();
 
 private:
   void captureLoop();
-  void processFFT(const std::vector<float>& samples);
+  std::vector<float> computeFFT(const std::vector<float>& samples);
+  void processAudio(const std::vector<float>& midSamples, const std::vector<float>& sideSamples);
 
   std::atomic<bool> running_;
   std::thread captureThread_;
   std::mutex dataMutex_;
 
-  std::vector<float> magnitudes_;
+  std::vector<float> midMagnitudes_;
+  std::vector<float> sideMagnitudes_;
+  std::vector<float> rawLeft_;
+  std::vector<float> rawRight_;
+  int rawBufferSize_;
   bool beat_;
   float volume_;
   int sampleRate_;

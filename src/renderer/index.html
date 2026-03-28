@@ -6,8 +6,9 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="drag-region"></div>
-  <button id="menu-btn">☰</button>
+  <div id="menu-area">
+    <button id="menu-btn">☰</button>
+  </div>
   <div id="app">
     <div id="panel">
   <div class="panel-section">
@@ -28,10 +29,24 @@
   </div>
 
   <div class="panel-section">
+    <h3>Audio Mode</h3>
+    <select id="audio-mode">
+      <option value="normal">Normal</option>
+      <option value="vocal-highlight">Vocal Highlight</option>
+      <option value="mid-side">Mid/Side Split</option>
+      <option value="ml-stems">ML Stems</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
     <h3>Sensitivity</h3>
     <div class="slider-group">
-      <label><span>Gain</span><span id="sensitivity-val">1.0</span></label>
-      <input type="range" id="sensitivity" min="0.1" max="5" step="0.1" value="1.0">
+      <label><span>Master Gain</span><span id="sensitivity-val">1.0</span></label>
+      <input type="range" id="sensitivity" min="0.1" max="10" step="0.1" value="1.0">
+    </div>
+    <div class="slider-group">
+      <label><span>Vocal Gain</span><span id="vocal-gain-val">1.0</span></label>
+      <input type="range" id="vocal-gain" min="0.1" max="10" step="0.1" value="1.0">
     </div>
   </div>
 
@@ -40,6 +55,14 @@
     <div class="slider-group">
       <label><span>Bars</span><span id="barcount-val">64</span></label>
       <input type="range" id="barcount" min="32" max="128" step="1" value="64">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Bar Size</h3>
+    <div class="slider-group">
+      <label><span>Size</span><span id="barsize-val">3</span></label>
+      <input type="range" id="barsize" min="1" max="10" step="1" value="3">
     </div>
   </div>
 
@@ -53,11 +76,25 @@
   </div>
 
   <div class="panel-section">
-    <h3>Beat Flash</h3>
+    <h3>Frequency Labels</h3>
     <div class="toggle">
-      <span>Enabled</span>
-      <input type="checkbox" id="beat-flash">
+      <span>Show</span>
+      <input type="checkbox" id="freq-labels">
     </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Beat Effect</h3>
+    <select id="beat-effect">
+      <option value="none">None</option>
+      <option value="flash">Flash</option>
+      <option value="bounce">Bar Bounce</option>
+      <option value="colorshift">Color Shift</option>
+      <option value="glow">Glow Pulse</option>
+      <option value="scale">Scale Pulse</option>
+      <option value="shake">Bass Shake</option>
+      <option value="border">Border Pulse</option>
+    </select>
   </div>
 </div>
     <div id="canvas-container">
