@@ -6,5 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onSampleRate: (callback) => {
     ipcRenderer.on('sample-rate', (_event, rate) => callback(rate));
-  }
+  },
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+  setTransparent: (enabled) => ipcRenderer.send('set-transparent', enabled),
 });

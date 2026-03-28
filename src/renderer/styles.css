@@ -45,3 +45,61 @@ body {
 
 body.transparent #drag-region { display: block; }
 body.transparent { background: transparent; }
+
+#panel {
+  width: 250px;
+  background: rgba(20, 20, 20, 0.95);
+  border-right: 1px solid #222;
+  padding: 20px;
+  position: fixed;
+  top: 0; left: 0;
+  height: 100%;
+  z-index: 10;
+  overflow-y: auto;
+  transform: translateX(-250px);
+  transition: transform 0.3s ease;
+}
+
+#panel.open { transform: translateX(0); }
+
+.panel-section { margin-bottom: 20px; }
+
+.panel-section h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.mode-btn {
+  display: block; width: 100%;
+  padding: 8px 12px; margin-bottom: 4px;
+  background: #1a1a1a; border: 1px solid #333;
+  color: #ccc; cursor: pointer;
+  border-radius: 4px; text-align: left;
+  font-size: 13px;
+}
+
+.mode-btn:hover { background: #222; }
+.mode-btn.active { background: #2a2a2a; border-color: #00aaff; color: #fff; }
+
+.slider-group { margin-bottom: 8px; }
+
+.slider-group label {
+  display: flex; justify-content: space-between;
+  font-size: 13px; color: #aaa; margin-bottom: 4px;
+}
+
+input[type="range"] { width: 100%; accent-color: #00aaff; }
+
+select {
+  width: 100%; padding: 6px;
+  background: #1a1a1a; border: 1px solid #333;
+  color: #ccc; border-radius: 4px; font-size: 13px;
+}
+
+.toggle {
+  display: flex; justify-content: space-between;
+  align-items: center; font-size: 13px; color: #aaa;
+}

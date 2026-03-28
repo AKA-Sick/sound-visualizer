@@ -9,6 +9,57 @@
   <div id="drag-region"></div>
   <button id="menu-btn">☰</button>
   <div id="app">
+    <div id="panel">
+  <div class="panel-section">
+    <h3>Visualization</h3>
+    <button class="mode-btn active" data-mode="segmented-led">Segmented LED</button>
+    <button class="mode-btn" data-mode="neon-glow">Neon Glow</button>
+    <button class="mode-btn" data-mode="mirrored">Mirrored</button>
+  </div>
+
+  <div class="panel-section">
+    <h3>Color Theme</h3>
+    <select id="theme-select">
+      <option value="neon">Neon</option>
+      <option value="ice">Ice</option>
+      <option value="fire">Fire</option>
+      <option value="monochrome">Monochrome</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
+    <h3>Sensitivity</h3>
+    <div class="slider-group">
+      <label><span>Gain</span><span id="sensitivity-val">1.0</span></label>
+      <input type="range" id="sensitivity" min="0.1" max="5" step="0.1" value="1.0">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Bar Count</h3>
+    <div class="slider-group">
+      <label><span>Bars</span><span id="barcount-val">64</span></label>
+      <input type="range" id="barcount" min="16" max="128" step="1" value="64">
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>Background</h3>
+    <select id="bg-select">
+      <option value="solid">Solid Dark</option>
+      <option value="gradient">Gradient</option>
+      <option value="transparent">Transparent</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
+    <h3>Beat Flash</h3>
+    <div class="toggle">
+      <span>Enabled</span>
+      <input type="checkbox" id="beat-flash">
+    </div>
+  </div>
+</div>
     <div id="canvas-container">
       <canvas id="visualizer"></canvas>
     </div>

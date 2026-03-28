@@ -97,4 +97,7 @@ registerVisualizer('segmented-led', new SegmentedLED());
 registerVisualizer('neon-glow', new NeonGlow());
 registerVisualizer('mirrored', new Mirrored());
 setVisualizer('segmented-led');
+
+import './ui/panel.js';
+
 render();
