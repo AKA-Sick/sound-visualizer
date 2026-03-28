@@ -30,8 +30,42 @@ function createWindow() {
     settingsStore.update(newSettings);
   });
 
-  ipcMain.on('set-transparent', (_event, _enabled) => {
-    // No-op for now; implemented in Task 13
+  ipcMain.on('set-transparent', (_event, enabled) => {
+    if (!mainWindow) return;
+
+    const bounds = mainWindow.getBounds();
+    const currentSettings = settingsStore.get();
+
+    if (audioBridge) audioBridge.stop();
+    mainWindow.close();
+
+    mainWindow = new BrowserWindow({
+      ...bounds,
+      minWidth: 600,
+      minHeight: 400,
+      frame: !enabled,
+      transparent: enabled,
+      alwaysOnTop: enabled,
+      backgroundColor: enabled ? '#00000000' : '#0a0a0a',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    mainWindow.webContents.on('did-finish-load', () => {
+      audioBridge = new AudioBridge(mainWindow);
+      audioBridge.start();
+      const newSettings = { ...currentSettings, background: enabled ? 'transparent' : 'solid' };
+      mainWindow.webContents.send('apply-settings', newSettings);
+    });
+
+    mainWindow.on('closed', () => {
+      if (audioBridge) audioBridge.stop();
+      mainWindow = null;
+    });
   });
 
   mainWindow.webContents.on('did-finish-load', () => {

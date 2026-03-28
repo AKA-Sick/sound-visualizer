@@ -10,4 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   setTransparent: (enabled) => ipcRenderer.send('set-transparent', enabled),
+  onApplySettings: (callback) => {
+    ipcRenderer.on('apply-settings', (_event, settings) => callback(settings));
+  },
 });
