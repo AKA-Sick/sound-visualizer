@@ -1,0 +1,25 @@
+{
+  "name": "sound-visualizer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/main/main.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild",
+    "build-addon": "cd src/native && node-gyp rebuild",
+    "test": "node --test test/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^41.1.0",
+    "electron-rebuild": "^3.2.9",
+    "node-addon-api": "^8.7.0",
+    "node-gyp": "^12.2.0"
+  }
+}
