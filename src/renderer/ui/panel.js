@@ -61,7 +61,7 @@ document.getElementById('bg-select').addEventListener('change', (e) => {
 
 // Beat flash toggle
 document.getElementById('beat-flash').addEventListener('change', (e) => {
-  updateSettings({ beatFlash: e.checked });
+  updateSettings({ beatFlash: e.target.checked });
   window.electronAPI.saveSettings(settings);
 });
 
