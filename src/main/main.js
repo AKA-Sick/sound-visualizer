@@ -1,7 +1,9 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const AudioBridge = require('./audio-bridge');
 
 let mainWindow;
+let audioBridge;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -18,6 +20,16 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    audioBridge = new AudioBridge(mainWindow);
+    audioBridge.start();
+  });
+
+  mainWindow.on('closed', () => {
+    if (audioBridge) audioBridge.stop();
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(createWindow);

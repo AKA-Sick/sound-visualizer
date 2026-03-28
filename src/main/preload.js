@@ -1,5 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Will be populated in later tasks
+  onAudioData: (callback) => {
+    ipcRenderer.on('audio-data', (_event, data) => callback(data));
+  },
+  onSampleRate: (callback) => {
+    ipcRenderer.on('sample-rate', (_event, rate) => callback(rate));
+  }
 });
