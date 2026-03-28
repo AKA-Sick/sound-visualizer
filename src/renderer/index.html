@@ -3,34 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <title>Sound Visualizer</title>
-  <style>
-    body { margin: 0; background: #0a0a0a; color: #0f0; font-family: monospace;
-           padding: 20px; }
-    pre { font-size: 12px; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h2>Audio Data Test</h2>
-  <pre id="output">Waiting for audio data...</pre>
-  <script>
-    const output = document.getElementById('output');
-    let sampleRate = 0;
-
-    window.electronAPI.onSampleRate((rate) => {
-      sampleRate = rate;
-    });
-
-    window.electronAPI.onAudioData((data) => {
-      const maxVal = Math.max(...data.frequencyData).toFixed(4);
-      const nonZero = data.frequencyData.filter(v => v > 0).length;
-      output.textContent =
-        `Sample Rate: ${sampleRate}\n` +
-        `Bins: ${data.frequencyData.length}\n` +
-        `Max magnitude: ${maxVal}\n` +
-        `Non-zero bins: ${nonZero}\n` +
-        `Beat: ${data.beat}\n` +
-        `Volume: ${data.volume.toFixed(4)}`;
-    });
-  </script>
+  <div id="drag-region"></div>
+  <button id="menu-btn">☰</button>
+  <div id="app">
+    <div id="canvas-container">
+      <canvas id="visualizer"></canvas>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
