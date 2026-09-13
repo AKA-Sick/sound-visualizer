@@ -58,14 +58,32 @@ function createWindow() {
   });
 
   ipcMain.handle('process-audio-pcm', async (event, { hash, dir, left, right, sampleRate }) => {
-    const session = await stemModel.loadSession(app.getPath('userData'));
+    let session = await stemModel.loadSession(app.getPath('userData'));
+    let cpuFallbackAttempted = false;
 
     const runInference = async (chunkLeft, chunkRight) => {
       const ort = require('onnxruntime-node');
       const inputTensor = new ort.Tensor('float32',
         Float32Array.from([...chunkLeft, ...chunkRight]),
         [1, 2, chunkLeft.length]);
-      const results = await session.run({ [session.inputNames[0]]: inputTensor });
+      let results;
+      try {
+        results = await session.run({ [session.inputNames[0]]: inputTensor });
+      } catch (err) {
+        if (cpuFallbackAttempted) throw err;
+        // Session *creation* can succeed (e.g. with the 'dml' execution
+        // provider) while actual session.run() still fails at runtime (a
+        // real DirectML OOM was observed on some GPUs). Rebuild a CPU-only
+        // session for the rest of THIS run instead of failing the whole
+        // file, and drop the memoized session so the NEXT file-load also
+        // gets a fresh session-creation-and-fallback cycle rather than
+        // reusing this broken one.
+        cpuFallbackAttempted = true;
+        console.error('process-audio-pcm: session.run failed, retrying with a fresh CPU-only session:', err);
+        stemModel.resetSession();
+        session = await stemModel.loadCpuOnlySession(app.getPath('userData'));
+        results = await session.run({ [session.inputNames[0]]: inputTensor });
+      }
       const outputData = results[session.outputNames[0]].data;
       const chunkLen = chunkLeft.length;
       const stems = {};

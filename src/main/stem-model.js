@@ -68,7 +68,36 @@ async function loadSession(userDataPath) {
       return await ort.InferenceSession.create(dest, { executionProviders: ['cpu'] });
     }
   })();
+  // If this attempt ever rejects (a failed model download, or session
+  // creation failing on both providers), forget it so the NEXT call to
+  // loadSession() starts a completely fresh attempt instead of returning
+  // the same broken/rejected promise forever.
+  sessionPromise.catch(() => { sessionPromise = null; });
   return sessionPromise;
 }
 
-module.exports = { MODEL_NAME, MODEL_URL, STEM_ORDER, modelPath, ensureModel, loadSession };
+// Force-drop the memoized session so the next loadSession() call starts
+// fresh. Used when a session was created successfully but later failed
+// during actual session.run() (e.g. a DirectML runtime OOM) — creation-time
+// success doesn't guarantee run-time success, so callers that hit that case
+// should call this in addition to building a one-off CPU session for the
+// rest of their current run via loadCpuOnlySession().
+function resetSession() {
+  sessionPromise = null;
+}
+
+// Build a brand-new CPU-only session, independent of the memoized
+// sessionPromise. Used for same-run recovery when a memoized (possibly
+// DML) session fails during session.run() — the caller swaps this in for
+// the remainder of its current processing run without disturbing whatever
+// loadSession() will hand out next time.
+async function loadCpuOnlySession(userDataPath) {
+  const dest = await ensureModel(userDataPath);
+  const ort = require('onnxruntime-node');
+  return ort.InferenceSession.create(dest, { executionProviders: ['cpu'] });
+}
+
+module.exports = {
+  MODEL_NAME, MODEL_URL, STEM_ORDER, modelPath, ensureModel,
+  loadSession, resetSession, loadCpuOnlySession
+};
