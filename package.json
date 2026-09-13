@@ -23,6 +23,7 @@
     "node-gyp": "^12.2.0"
   },
   "dependencies": {
+    "music-metadata": "^11.15.0",
     "onnxruntime-node": "^1.29.0"
   }
 }
