@@ -1045,6 +1045,12 @@ export class FileAudioSource {
     this.stopPlayback();
     if (!this.audioContext) this.audioContext = new AudioContext({ sampleRate: 44100 });
 
+    // Reset per-track state: a stale beat-detector average from the
+    // previous song would misjudge the new song's energy baseline until
+    // the EMA reconverges (false beats if the new track is louder,
+    // suppressed beats if quieter).
+    this.detectBeat = createBeatDetector();
+
     const { hash, cached, dir } = await window.electronAPI.checkStemCache(filePath);
 
     if (!cached) {
@@ -1069,7 +1075,13 @@ export class FileAudioSource {
     }
     this.duration = this.stemBuffers[STEM_NAMES[0]].duration;
     this.pausedAt = 0;
-    this._buildGraph();
+
+    // Build the mixer graph (mixBus/analyser/gainNodes) once and reuse it
+    // across every loadFile() call in this instance's lifetime -- rebuilding
+    // it per load would leave the previous chain permanently connected to
+    // ctx.destination (Web Audio won't GC a still-connected node), leaking
+    // 8 nodes per song switch for the life of the session.
+    if (!this.mixBus) this._buildGraph();
   }
 
   _buildGraph() {
