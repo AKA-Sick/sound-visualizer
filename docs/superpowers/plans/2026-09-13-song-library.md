@@ -1320,7 +1320,11 @@ Replace the prior feature's single-file section (`#file-controls`'s Load File bu
 - [ ] **Step 2: Wire it up in `panel.js`**
 
 ```js
-import { libraryManager, setCurrentPlayingHash, fileAudioSource } from '../app.js';
+// `fileAudioSource` is already imported on the existing
+// `import { fileAudioSource, setSourceMode } from '../app.js';` line near the
+// top of this file (from the prior feature) -- do NOT add it to this new
+// import statement too, that would be a duplicate-binding SyntaxError.
+import { libraryManager, setCurrentPlayingHash } from '../app.js';
 import { sortEntries, filterEntries } from '../audio/library-sort-filter.js';
 
 // loadFileBtn is already declared earlier in this file (prior feature's Task 10) --
