@@ -102,15 +102,21 @@ loadFileBtn.addEventListener('click', async () => {
   const filePath = await window.electronAPI.pickAudioFile();
   if (!filePath) return;
 
-  fileError.hidden = true;
-  fileError.textContent = '';
-  fileTransport.hidden = true;
-  stemMixer.hidden = true;
-  fileProgress.hidden = false;
-  fileProgressLabel.textContent = 'Checking cache…';
-  fileProgressBar.value = 0;
-
+  loadFileBtn.disabled = true;
   try {
+    fileError.hidden = true;
+    fileError.textContent = '';
+    fileTransport.hidden = true;
+    stemMixer.hidden = true;
+    fileProgress.hidden = false;
+    // First use may need to download the ~258MB separation model, which can
+    // take several minutes with no per-byte progress available yet — show a
+    // reassuring static message instead of leaving the user on "Checking
+    // cache…" indistinguishable from a hang. Real progress (below) overwrites
+    // this as soon as separation actually starts reporting percentages.
+    fileProgressLabel.textContent = 'Checking cache… (first use downloads a ~258MB model — this may take several minutes)';
+    fileProgressBar.value = 0;
+
     await fileAudioSource.loadFile(filePath, (percent) => {
       fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
       fileProgressBar.value = percent * 100;
@@ -126,6 +132,8 @@ loadFileBtn.addEventListener('click', async () => {
     fileProgress.hidden = true;
     fileError.hidden = false;
     fileError.textContent = `Failed to process file: ${err.message || err}`;
+  } finally {
+    loadFileBtn.disabled = false;
   }
 });
 
