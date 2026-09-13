@@ -156,7 +156,15 @@ function createWindow() {
   ipcMain.handle('scan-folder', async (event, folderPath) => {
     const files = scanFolder(folderPath);
     for (let i = 0; i < files.length; i++) {
-      await addFileToLibrary(files[i]);
+      try {
+        await addFileToLibrary(files[i]);
+      } catch (err) {
+        // Spec requires per-file failure isolation during a folder scan
+        // (unreadable/permission-denied/vanished file): skip it and keep
+        // going, don't abort the whole scan and silently drop every file
+        // after the bad one.
+        console.error(`Failed to add "${files[i]}" to library:`, err.message || err);
+      }
       event.sender.send('folder-scan-progress', {
         current: i + 1, total: files.length, fileName: path.basename(files[i])
       });
