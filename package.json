@@ -21,5 +21,8 @@
     "electron-rebuild": "^3.2.9",
     "node-addon-api": "^8.7.0",
     "node-gyp": "^12.2.0"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.29.0"
   }
 }
