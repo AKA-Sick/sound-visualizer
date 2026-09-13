@@ -1359,6 +1359,7 @@ Add a new `panel-section` near the top of `#panel` (right after the existing the
     <span id="file-progress-label">Separating stems… 0%</span>
     <progress id="file-progress-bar" max="100" value="0"></progress>
   </div>
+  <div id="file-error" hidden></div>
   <div id="file-transport" hidden>
     <button id="file-play-btn">Play</button>
     <button id="file-pause-btn">Pause</button>
@@ -1429,6 +1430,7 @@ const fileSeek = document.getElementById('file-seek');
 const stemMixer = document.getElementById('stem-mixer');
 const cacheSizeLabel = document.getElementById('cache-size-label');
 const clearCacheBtn = document.getElementById('clear-cache-btn');
+const fileError = document.getElementById('file-error');
 
 function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -1449,22 +1451,35 @@ loadFileBtn.addEventListener('click', async () => {
   const filePath = await window.electronAPI.pickAudioFile();
   if (!filePath) return;
 
+  fileError.hidden = true;
+  fileError.textContent = '';
   fileTransport.hidden = true;
   stemMixer.hidden = true;
   fileProgress.hidden = false;
   fileProgressLabel.textContent = 'Checking cache…';
   fileProgressBar.value = 0;
 
-  await fileAudioSource.loadFile(filePath, (percent) => {
-    fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
-    fileProgressBar.value = percent * 100;
-  });
+  try {
+    await fileAudioSource.loadFile(filePath, (percent) => {
+      fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
+      fileProgressBar.value = percent * 100;
+    });
 
-  fileProgress.hidden = true;
-  fileTransport.hidden = false;
-  stemMixer.hidden = false;
-  fileSeek.max = fileAudioSource.getDuration();
-  await refreshCacheSize();
+    fileProgress.hidden = true;
+    fileTransport.hidden = false;
+    stemMixer.hidden = false;
+    fileSeek.max = fileAudioSource.getDuration();
+    await refreshCacheSize();
+  } catch (err) {
+    // Without this, any failure anywhere in the pipeline (a corrupt file,
+    // a model/inference error, a disk-write failure) leaves the progress
+    // bar showing "Separating stems..." forever with no feedback -- the
+    // spec requires surfacing failures, not silently hanging.
+    console.error('Failed to load/process audio file:', err);
+    fileProgress.hidden = true;
+    fileError.hidden = false;
+    fileError.textContent = `Failed to process file: ${err.message || err}`;
+  }
 });
 
 filePlayBtn.addEventListener('click', () => fileAudioSource.play());
@@ -1532,6 +1547,12 @@ Add:
   margin-top: 8px;
   font-size: 0.85em;
   opacity: 0.8;
+}
+
+#file-error {
+  color: #ff6b6b;
+  font-size: 0.85em;
+  margin-top: 8px;
 }
 ```
 
