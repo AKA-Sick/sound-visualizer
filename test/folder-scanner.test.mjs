@@ -49,4 +49,12 @@ describe('scanFolder', () => {
   it('returns an empty array without throwing for a nonexistent path', () => {
     assert.deepEqual(scanFolder(path.join(root, 'does-not-exist')), []);
   });
+
+  it('returns absolute paths even when given a relative folderPath', () => {
+    fs.writeFileSync(path.join(root, 'a.mp3'), '');
+    const relative = path.relative(process.cwd(), root);
+    const found = scanFolder(relative);
+    assert.equal(found.length, 1);
+    assert.ok(path.isAbsolute(found[0]));
+  });
 });

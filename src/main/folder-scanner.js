@@ -5,7 +5,12 @@ const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.ogg']);
 
 function scanFolder(folderPath) {
   const results = [];
-  const stack = [folderPath];
+  // Resolve to absolute up front -- path.join preserves absoluteness from
+  // here on for every entry pushed below, so a relative folderPath (the
+  // interface's documented contract requires absolute paths out; Electron's
+  // folder picker always returns one, but this makes it true unconditionally
+  // rather than only by caller convention) doesn't leak into the results.
+  const stack = [path.resolve(folderPath)];
 
   while (stack.length > 0) {
     const dir = stack.pop();
