@@ -8,7 +8,8 @@ const DEFAULTS = {
   sensitivity: 1.0,
   barCount: 64,
   background: 'solid',
-  beatFlash: false
+  beatFlash: false,
+  source: 'live'
 };
 
 class SettingsStore {
