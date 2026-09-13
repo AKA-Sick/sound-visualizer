@@ -834,7 +834,7 @@ Inside `createWindow()`, alongside the existing `ipcMain.handle('get-settings', 
   });
 ```
 
-**Note on `process-audio-pcm`'s tensor shape:** the exact input tensor shape (`[1, 2, chunkLeft.length]` above) and the output slicing math (`stemIndex * 2 * chunkLen` — assuming one output tensor of shape `[6, 2, samples]`) are placeholders based on the most common HTDemucs ONNX export convention, and **must be corrected here to match whatever Task 1 Step 3 actually discovered** about this specific model's input/output tensor shapes (fixed vs dynamic length, single vs multiple output tensors, stem order). Update this handler to match those confirmed findings before moving on — do not leave the assumed shape unverified.
+**Confirmed tensor contract (Task 1's discovery):** input tensor `mix`, shape `[1, 2, 343980]` — fixed length, not dynamic (343980 = 7.8s × 44100Hz, matching `SEGMENT_SAMPLES` above exactly). Output tensor `stems`, shape `[1, 6, 2, 343980]`, stem order `drums, bass, other, vocals, guitar, piano` (matches `stemModel.STEM_ORDER`). The leading batch dimension of 1 doesn't change flat-buffer offsets, so the input tensor shape `[1, 2, chunkLeft.length]` and the output slicing math (`stemIndex * 2 * chunkLen`) in the handler below are already correct as written — no changes needed.
 
 - [ ] **Step 3: Manual verification**
 
