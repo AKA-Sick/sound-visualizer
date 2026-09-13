@@ -19,6 +19,69 @@
   </div>
 
   <div class="panel-section">
+    <label>Source</label>
+    <select id="source-select">
+      <option value="live">Live System Audio</option>
+      <option value="file">Audio File</option>
+    </select>
+  </div>
+
+  <div class="panel-section" id="file-controls" hidden>
+    <button id="load-file-btn">Load File…</button>
+    <div id="file-progress" hidden>
+      <span id="file-progress-label">Separating stems… 0%</span>
+      <progress id="file-progress-bar" max="100" value="0"></progress>
+    </div>
+    <div id="file-transport" hidden>
+      <button id="file-play-btn">Play</button>
+      <button id="file-pause-btn">Pause</button>
+      <input type="range" id="file-seek" min="0" max="100" step="0.1" value="0">
+    </div>
+    <div id="stem-mixer" hidden>
+      <div class="stem-row" data-stem="vocals">
+        <label>Vocals</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+      <div class="stem-row" data-stem="drums">
+        <label>Drums</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+      <div class="stem-row" data-stem="bass">
+        <label>Bass</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+      <div class="stem-row" data-stem="guitar">
+        <label>Guitar</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+      <div class="stem-row" data-stem="piano">
+        <label>Piano</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+      <div class="stem-row" data-stem="other">
+        <label>Other</label>
+        <input type="checkbox" class="stem-mute">
+        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+        <button class="stem-solo">Solo</button>
+      </div>
+    </div>
+    <div id="cache-info">
+      <span id="cache-size-label">Cache: 0 MB</span>
+      <button id="clear-cache-btn">Clear Cache</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
     <h3>Color Theme</h3>
     <select id="theme-select">
       <option value="neon">Neon</option>

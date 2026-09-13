@@ -103,3 +103,23 @@ select {
   display: flex; justify-content: space-between;
   align-items: center; font-size: 13px; color: #aaa;
 }
+
+#file-controls #stem-mixer .stem-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+#file-controls #stem-mixer .stem-row label {
+  width: 60px;
+}
+
+#cache-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
