@@ -95,6 +95,7 @@ sourceSelect.addEventListener('change', (e) => {
   setSourceMode(e.target.value);
   fileControls.hidden = e.target.value !== 'file';
   if (e.target.value === 'file') refreshCacheSize();
+  window.electronAPI.saveSettings(settings);
 });
 
 loadFileBtn.addEventListener('click', async () => {
@@ -175,6 +176,8 @@ async function loadSettings() {
     });
     document.getElementById('theme-select').value = saved.theme;
     document.getElementById('source-select').value = saved.source || 'live';
+    setSourceMode(saved.source || 'live');
+    fileControls.hidden = (saved.source || 'live') !== 'file';
     document.getElementById('sensitivity').value = saved.sensitivity;
     document.getElementById('sensitivity-val').textContent = saved.sensitivity.toFixed(1);
     document.getElementById('barcount').value = saved.barCount;
