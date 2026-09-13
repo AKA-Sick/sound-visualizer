@@ -39,4 +39,13 @@ describe('extractFeaturedArtists', () => {
   it('splits multiple featured artists on ","', () => {
     assert.deepEqual(extractFeaturedArtists('Song Name (feat. Artist B, Artist C)'), ['Artist B', 'Artist C']);
   });
+
+  it('does not match "ft" embedded inside an ordinary word', () => {
+    assert.deepEqual(extractFeaturedArtists('Drift Away'), []);
+    assert.deepEqual(extractFeaturedArtists('Swift Escape'), []);
+  });
+
+  it('does not match a bare "with" that is not inside parens/brackets', () => {
+    assert.deepEqual(extractFeaturedArtists('Stuck With You'), []);
+  });
 });
