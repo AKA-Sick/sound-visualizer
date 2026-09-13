@@ -73,6 +73,7 @@ const loadFileBtn = document.getElementById('load-file-btn');
 const fileProgress = document.getElementById('file-progress');
 const fileProgressLabel = document.getElementById('file-progress-label');
 const fileProgressBar = document.getElementById('file-progress-bar');
+const fileError = document.getElementById('file-error');
 const fileTransport = document.getElementById('file-transport');
 const filePlayBtn = document.getElementById('file-play-btn');
 const filePauseBtn = document.getElementById('file-pause-btn');
@@ -100,22 +101,31 @@ loadFileBtn.addEventListener('click', async () => {
   const filePath = await window.electronAPI.pickAudioFile();
   if (!filePath) return;
 
+  fileError.hidden = true;
+  fileError.textContent = '';
   fileTransport.hidden = true;
   stemMixer.hidden = true;
   fileProgress.hidden = false;
   fileProgressLabel.textContent = 'Checking cache…';
   fileProgressBar.value = 0;
 
-  await fileAudioSource.loadFile(filePath, (percent) => {
-    fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
-    fileProgressBar.value = percent * 100;
-  });
+  try {
+    await fileAudioSource.loadFile(filePath, (percent) => {
+      fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
+      fileProgressBar.value = percent * 100;
+    });
 
-  fileProgress.hidden = true;
-  fileTransport.hidden = false;
-  stemMixer.hidden = false;
-  fileSeek.max = fileAudioSource.getDuration();
-  await refreshCacheSize();
+    fileProgress.hidden = true;
+    fileTransport.hidden = false;
+    stemMixer.hidden = false;
+    fileSeek.max = fileAudioSource.getDuration();
+    await refreshCacheSize();
+  } catch (err) {
+    console.error('Failed to load/process audio file:', err);
+    fileProgress.hidden = true;
+    fileError.hidden = false;
+    fileError.textContent = `Failed to process file: ${err.message || err}`;
+  }
 });
 
 filePlayBtn.addEventListener('click', () => fileAudioSource.play());

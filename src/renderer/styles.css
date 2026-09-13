@@ -123,3 +123,9 @@ select {
   font-size: 0.85em;
   opacity: 0.8;
 }
+
+#file-error {
+  color: #ff6b6b;
+  font-size: 0.85em;
+  margin-top: 8px;
+}
