@@ -22,6 +22,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readStemAudio: (dir) => ipcRenderer.invoke('read-stem-audio', dir),
   getStemCacheSize: () => ipcRenderer.invoke('read-stem-cache-size'),
   clearStemCache: () => ipcRenderer.invoke('clear-stem-cache'),
+
+  pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  scanFolder: (folderPath) => ipcRenderer.invoke('scan-folder', folderPath),
+  onFolderScanProgress: (callback) => { folderScanProgressCallback = callback; },
+  getLibrary: () => ipcRenderer.invoke('get-library'),
+  addSingleFileToLibrary: (filePath) => ipcRenderer.invoke('add-single-file-to-library', filePath),
+  setFavorite: (hash, favorite) => ipcRenderer.invoke('set-favorite', hash, favorite),
+  removeLibraryEntry: (hash) => ipcRenderer.invoke('remove-library-entry', hash),
+  recordPlay: (hash) => ipcRenderer.invoke('record-play', hash),
+  markLibraryProcessed: (hash, duration) => ipcRenderer.invoke('mark-library-processed', hash, duration),
 });
 
 // A single persistent listener that forwards to whichever callback
@@ -31,4 +41,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 let stemProgressCallback = null;
 ipcRenderer.on('stem-progress', (_event, data) => {
   if (stemProgressCallback) stemProgressCallback(data.percent);
+});
+
+// Same single-persistent-listener pattern as stem-progress above, applied to
+// folder scan progress: one ipcRenderer.on(...) registered once at module
+// scope, forwarding to whichever callback onFolderScanProgress most recently
+// registered, rather than stacking a new listener per scanFolder() call.
+let folderScanProgressCallback = null;
+ipcRenderer.on('folder-scan-progress', (_event, data) => {
+  if (folderScanProgressCallback) folderScanProgressCallback(data);
 });
