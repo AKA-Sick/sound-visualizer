@@ -75,6 +75,15 @@ describe('extractFeaturedArtists', () => {
   it('splits multiple featured artists on ","', () => {
     assert.deepEqual(extractFeaturedArtists('Song Name (feat. Artist B, Artist C)'), ['Artist B', 'Artist C']);
   });
+
+  it('does not match "ft" embedded inside an ordinary word', () => {
+    assert.deepEqual(extractFeaturedArtists('Drift Away'), []);
+    assert.deepEqual(extractFeaturedArtists('Swift Escape'), []);
+  });
+
+  it('does not match a bare "with" that is not inside parens/brackets', () => {
+    assert.deepEqual(extractFeaturedArtists('Stuck With You'), []);
+  });
 });
 ```
 
@@ -86,13 +95,22 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Write `feat-parser.js`**
 
 ```js
-const FEAT_PATTERN = /[([]?\s*(?:feat\.?|ft\.?|featuring|with)\s+([^()[\]]+?)\s*[)\]]?$/i;
+// Two branches, not one shared alternation:
+//   1. "with" must be inside parens/brackets -- it's too common an ordinary
+//      English word (e.g. "Stuck With You") to safely treat as a features
+//      marker unless it's bracket-confined, which also matches how the
+//      design spec itself writes the example ("(with ...)", parens included).
+//   2. feat/ft/featuring may appear bare (no parens needed, e.g. "Song feat.
+//      Artist") but must sit at a word boundary -- without `\b`, "ft" matches
+//      the literal substring inside ordinary words like "Drift" or "Swift".
+const FEAT_PATTERN = /(?:[([]\s*with\s+([^()[\]]+?)\s*[)\]]$|[([]?\s*\b(?:feat\.?|ft\.?|featuring)\s+([^()[\]]+?)\s*[)\]]?$)/i;
 
 function extractFeaturedArtists(title) {
   if (!title) return [];
   const match = title.match(FEAT_PATTERN);
   if (!match) return [];
-  return match[1]
+  const namesPart = match[1] || match[2];
+  return namesPart
     .split(/\s*(?:,|&|\band\b)\s*/i)
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
@@ -100,6 +118,8 @@ function extractFeaturedArtists(title) {
 
 module.exports = { extractFeaturedArtists };
 ```
+
+**Known, deliberately deferred limitation:** the trailing `$` anchor means a feat./with clause followed by something else at the very end of the title (e.g. `"Song (feat. Artist B) [Remix]"`) is not extracted at all (returns `[]`) rather than still finding "Artist B" — the spec doesn't explicitly require handling a trailing remix/live tag after the credit, and fixing it well (without reintroducing a false-positive risk) is a larger regex change than this pure-utility task warrants. Leave as-is; note it if it comes up in real use.
 
 - [ ] **Step 4: Run test to verify it passes**
 
