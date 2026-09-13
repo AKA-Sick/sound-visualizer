@@ -4,6 +4,7 @@ import { NeonGlow } from './visualizers/neon-glow.js';
 import { Mirrored } from './visualizers/mirrored.js';
 import { togglePanel } from './ui/panel.js';
 import { FileAudioSource } from './audio/file-source.js';
+import { LibraryManager } from './audio/library-manager.js';
 
 const canvas = document.getElementById('visualizer');
 const ctx = canvas.getContext('2d');
@@ -75,6 +76,20 @@ export function setSourceMode(mode) {
     sampleRate = liveSampleRate;
     fileAudioSource.pause();
   }
+}
+
+let currentLibraryEntries = [];
+let currentPlayingHash = null;
+let playRecordedForCurrentHash = false;
+
+export const libraryManager = new LibraryManager({
+  onLibraryChanged: (entries) => { currentLibraryEntries = entries; },
+  onQueueProgress: (info) => { /* consumed by panel.js in Task 11 via a small setter it defines there */ }
+});
+
+export function setCurrentPlayingHash(hash) {
+  currentPlayingHash = hash;
+  playRecordedForCurrentHash = false;
 }
 
 window.electronAPI.onApplySettings((newSettings) => {
@@ -381,6 +396,15 @@ function render() {
 
   // Reset beat after one frame
   currentBeat = false;
+
+  if (settings.source === 'file' && currentPlayingHash && !playRecordedForCurrentHash) {
+    const duration = fileAudioSource.getDuration();
+    const current = fileAudioSource.getCurrentTime();
+    if (duration > 0 && (current >= duration || current / duration >= 0.5)) {
+      playRecordedForCurrentHash = true;
+      libraryManager.recordPlay(currentPlayingHash);
+    }
+  }
 
   requestAnimationFrame(render);
 }
