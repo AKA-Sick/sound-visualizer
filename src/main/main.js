@@ -7,6 +7,9 @@ const stemModel = require('./stem-model');
 const stemCache = require('./stem-cache');
 const stemProcessor = require('./stem-processor');
 const { encodeWavStereo } = require('./stem-wav');
+const libraryStore = require('./library-store');
+const { scanFolder } = require('./folder-scanner');
+const { readMetadata } = require('./metadata-reader');
 
 const SEGMENT_SAMPLES = Math.round(7.8 * 44100); // confirmed via Task 1 model inspection (343980)
 const OVERLAP_FRACTION = 0.25;
@@ -132,6 +135,58 @@ function createWindow() {
 
   ipcMain.handle('clear-stem-cache', async () => {
     stemCache.clearCache(app.getPath('userData'));
+  });
+
+  ipcMain.handle('pick-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  async function addFileToLibrary(filePath) {
+    const hash = await stemCache.hashFile(filePath);
+    const cacheDir = stemCache.getCacheDir(app.getPath('userData'), hash);
+    const processed = stemCache.isCached(cacheDir);
+    const meta = await readMetadata(filePath);
+    return libraryStore.upsertEntry(app.getPath('userData'), hash, {
+      filePath, ...meta, processed
+    });
+  }
+
+  ipcMain.handle('scan-folder', async (event, folderPath) => {
+    const files = scanFolder(folderPath);
+    for (let i = 0; i < files.length; i++) {
+      await addFileToLibrary(files[i]);
+      event.sender.send('folder-scan-progress', {
+        current: i + 1, total: files.length, fileName: path.basename(files[i])
+      });
+    }
+    return libraryStore.loadLibrary(app.getPath('userData'));
+  });
+
+  ipcMain.handle('get-library', async () => {
+    return libraryStore.loadLibrary(app.getPath('userData'));
+  });
+
+  ipcMain.handle('add-single-file-to-library', async (_event, filePath) => {
+    await addFileToLibrary(filePath);
+    return libraryStore.loadLibrary(app.getPath('userData'));
+  });
+
+  ipcMain.handle('set-favorite', async (_event, hash, favorite) => {
+    return libraryStore.setFavorite(app.getPath('userData'), hash, favorite);
+  });
+
+  ipcMain.handle('remove-library-entry', async (_event, hash) => {
+    libraryStore.removeEntry(app.getPath('userData'), hash);
+  });
+
+  ipcMain.handle('record-play', async (_event, hash) => {
+    return libraryStore.recordPlay(app.getPath('userData'), hash);
+  });
+
+  ipcMain.handle('mark-library-processed', async (_event, hash, duration) => {
+    return libraryStore.markProcessed(app.getPath('userData'), hash, duration);
   });
 
   ipcMain.on('set-transparent', (_event, enabled) => {
