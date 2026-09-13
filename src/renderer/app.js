@@ -3,6 +3,7 @@ import { SegmentedLED } from './visualizers/segmented-led.js';
 import { NeonGlow } from './visualizers/neon-glow.js';
 import { Mirrored } from './visualizers/mirrored.js';
 import { togglePanel } from './ui/panel.js';
+import { FileAudioSource } from './audio/file-source.js';
 
 const canvas = document.getElementById('visualizer');
 const ctx = canvas.getContext('2d');
@@ -30,16 +31,23 @@ let settings = {
   audioMode: 'normal',
   background: 'solid',
   freqLabels: false,
-  beatEffect: 'none'
+  beatEffect: 'none',
+  source: 'live'
 };
 
 let currentVisualizer = null;
 const visualizers = {};
 
 // Receive audio data from main process
-window.electronAPI.onSampleRate((rate) => { sampleRate = rate; });
+const LIVE_SAMPLE_RATE_FALLBACK = 48000;
+let liveSampleRate = LIVE_SAMPLE_RATE_FALLBACK;
 
-window.electronAPI.onAudioData((data) => {
+window.electronAPI.onSampleRate((rate) => {
+  liveSampleRate = rate;
+  if (settings.source !== 'file') sampleRate = rate;
+});
+
+function handleAudioData(data) {
   rawMidData = data.midData;
   rawSideData = data.sideData;
   currentBeat = data.beat;
@@ -47,7 +55,27 @@ window.electronAPI.onAudioData((data) => {
   stemStatus = data.stemStatus || 'idle';
   if (data.vocalMags) rawVocalMags = data.vocalMags;
   if (data.instrumentMags) rawInstrumentMags = data.instrumentMags;
+}
+
+window.electronAPI.onAudioData((data) => {
+  if (settings.source !== 'file') handleAudioData(data);
 });
+
+export const fileAudioSource = new FileAudioSource({
+  onAudioData: (data) => {
+    if (settings.source === 'file') handleAudioData(data);
+  }
+});
+
+export function setSourceMode(mode) {
+  settings.source = mode;
+  if (mode === 'file') {
+    sampleRate = 44100; // FileAudioSource always uses a 44.1kHz AudioContext
+  } else {
+    sampleRate = liveSampleRate;
+    fileAudioSource.pause();
+  }
+}
 
 window.electronAPI.onApplySettings((newSettings) => {
   updateSettings(newSettings);
