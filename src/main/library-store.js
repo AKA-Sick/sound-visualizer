@@ -61,7 +61,13 @@ function markProcessed(userDataPath, hash, duration) {
   return upsertEntry(userDataPath, hash, { processed: true, duration });
 }
 
+function resetAllProcessed(userDataPath) {
+  const entries = loadLibrary(userDataPath).map((e) => ({ ...e, processed: false }));
+  saveLibrary(userDataPath, entries);
+  return entries;
+}
+
 module.exports = {
   getLibraryPath, loadLibrary, saveLibrary, upsertEntry, removeEntry,
-  setFavorite, recordPlay, markProcessed
+  setFavorite, recordPlay, markProcessed, resetAllProcessed
 };

@@ -317,6 +317,8 @@ for (const row of stemMixer.querySelectorAll('.stem-row')) {
 
 clearCacheBtn.addEventListener('click', async () => {
   await window.electronAPI.clearStemCache();
+  libraryManager.entries = await window.electronAPI.resetAllProcessed();
+  renderLibraryRows();
   await refreshCacheSize();
 });
 

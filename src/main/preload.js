@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeLibraryEntry: (hash) => ipcRenderer.invoke('remove-library-entry', hash),
   recordPlay: (hash) => ipcRenderer.invoke('record-play', hash),
   markLibraryProcessed: (hash, duration) => ipcRenderer.invoke('mark-library-processed', hash, duration),
+  resetAllProcessed: () => ipcRenderer.invoke('reset-all-processed'),
 });
 
 // A single persistent listener that forwards to whichever callback

@@ -210,6 +210,10 @@ function createWindow() {
     return libraryStore.markProcessed(app.getPath('userData'), hash, duration);
   });
 
+  ipcMain.handle('reset-all-processed', async () => {
+    return libraryStore.resetAllProcessed(app.getPath('userData'));
+  });
+
   ipcMain.on('set-transparent', (_event, enabled) => {
     if (!mainWindow) return;
 
