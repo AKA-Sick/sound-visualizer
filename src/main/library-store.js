@@ -22,7 +22,10 @@ function loadLibrary(userDataPath) {
 }
 
 function saveLibrary(userDataPath, entries) {
-  fs.writeFileSync(getLibraryPath(userDataPath), JSON.stringify(entries, null, 2));
+  const finalPath = getLibraryPath(userDataPath);
+  const tempPath = `${finalPath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tempPath, JSON.stringify(entries, null, 2));
+  fs.renameSync(tempPath, finalPath);
 }
 
 function upsertEntry(userDataPath, hash, fields) {
