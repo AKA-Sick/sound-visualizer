@@ -56,6 +56,11 @@ export class LibraryManager {
     this._replaceEntry(updated);
   }
 
+  async setGenre(hash, genre) {
+    const updated = await window.electronAPI.setGenre(hash, genre);
+    this._replaceEntry(updated);
+  }
+
   async removeEntry(hash) {
     await window.electronAPI.removeLibraryEntry(hash);
     this.entries = this.entries.filter((e) => e.hash !== hash);

@@ -13,6 +13,44 @@ export function togglePanel() {
   panel.classList.toggle('open');
 }
 
+// Resizable sidebar: a drag handle on the panel's right edge.
+const panelResizeHandle = document.getElementById('panel-resize-handle');
+
+function applyPanelWidth(width) {
+  panel.style.width = `${width}px`;
+  panelResizeHandle.style.left = `${width}px`;
+}
+
+(function setupPanelResize() {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  panelResizeHandle.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startWidth = panel.getBoundingClientRect().width;
+    panelResizeHandle.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const minWidth = 180;
+    const maxWidth = window.innerWidth * 0.7;
+    const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + (e.clientX - startX)));
+    applyPanelWidth(newWidth);
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    panelResizeHandle.classList.remove('dragging');
+    updateSettings({ panelWidth: panel.getBoundingClientRect().width });
+    window.electronAPI.saveSettings(settings);
+  });
+})();
+
 // Mode buttons
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -77,8 +115,9 @@ const fileProgressLabel = document.getElementById('file-progress-label');
 const fileProgressBar = document.getElementById('file-progress-bar');
 const fileError = document.getElementById('file-error');
 const fileTransport = document.getElementById('file-transport');
-const filePlayBtn = document.getElementById('file-play-btn');
-const filePauseBtn = document.getElementById('file-pause-btn');
+const filePlayPauseBtn = document.getElementById('file-playpause-btn');
+const filePrevBtn = document.getElementById('file-prev-btn');
+const fileNextBtn = document.getElementById('file-next-btn');
 const fileSeek = document.getElementById('file-seek');
 const stemMixer = document.getElementById('stem-mixer');
 const cacheSizeLabel = document.getElementById('cache-size-label');
@@ -96,6 +135,129 @@ const queueStatusLabel = document.getElementById('queue-status-label');
 
 let sortField = 'title';
 let sortDirection = 'asc';
+let lastSortedEntries = [];
+let currentPlayingHash = null;
+
+// Resizable columns: a drag handle injected into each sortable header.
+// Headers are static markup (not rebuilt per render), so this runs once.
+function setupColumnResize() {
+  for (const th of document.querySelectorAll('#library-table th[data-sort-field]')) {
+    const handle = document.createElement('div');
+    handle.className = 'column-resize-handle';
+    th.appendChild(handle);
+
+    // A click that both starts and ends inside the handle would otherwise
+    // bubble up and also trigger the header's own sort-toggle click handler.
+    handle.addEventListener('click', (e) => e.stopPropagation());
+
+    let dragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      dragging = true;
+      startX = e.clientX;
+      startWidth = th.getBoundingClientRect().width;
+      handle.classList.add('dragging');
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const newWidth = Math.max(40, startWidth + (e.clientX - startX));
+      th.style.width = `${newWidth}px`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      const field = th.dataset.sortField;
+      const widths = { ...settings.libraryColumnWidths, [field]: th.getBoundingClientRect().width };
+      updateSettings({ libraryColumnWidths: widths });
+      window.electronAPI.saveSettings(settings);
+    });
+  }
+}
+
+function applyColumnWidths(widths) {
+  if (!widths) return;
+  for (const th of document.querySelectorAll('#library-table th[data-sort-field]')) {
+    const w = widths[th.dataset.sortField];
+    if (w) th.style.width = `${w}px`;
+  }
+}
+
+// Right-click context menu (Play / Delete / Genre submenu) for library rows.
+const contextMenuEl = document.getElementById('library-context-menu');
+
+function hideContextMenu() {
+  contextMenuEl.hidden = true;
+  contextMenuEl.innerHTML = '';
+}
+
+function buildMenuItem(label, onClick) {
+  const item = document.createElement('div');
+  item.className = 'context-menu-item';
+  item.textContent = label;
+  item.addEventListener('click', () => {
+    hideContextMenu();
+    onClick();
+  });
+  return item;
+}
+
+function showLibraryContextMenu(x, y, entry) {
+  contextMenuEl.innerHTML = '';
+
+  contextMenuEl.appendChild(buildMenuItem('Play', () => playLibraryEntry(entry)));
+  contextMenuEl.appendChild(buildMenuItem('Delete', () => libraryManager.removeEntry(entry.hash)));
+
+  const genreItem = document.createElement('div');
+  genreItem.className = 'context-menu-item has-submenu';
+  const genreLabel = document.createElement('span');
+  genreLabel.textContent = 'Genre';
+  genreItem.appendChild(genreLabel);
+
+  const submenu = document.createElement('div');
+  submenu.className = 'context-menu-submenu context-menu';
+  const genres = [...new Set(libraryManager.entries.map((e) => e.genre).filter(Boolean))].sort();
+  for (const g of genres) {
+    submenu.appendChild(buildMenuItem(g, () => libraryManager.setGenre(entry.hash, g)));
+  }
+  submenu.appendChild(buildMenuItem('Add new genre…', () => {
+    const newGenre = prompt('Enter a genre:', entry.genre || '');
+    if (newGenre && newGenre.trim()) libraryManager.setGenre(entry.hash, newGenre.trim());
+  }));
+  genreItem.appendChild(submenu);
+  contextMenuEl.appendChild(genreItem);
+
+  contextMenuEl.style.left = `${x}px`;
+  contextMenuEl.style.top = `${y}px`;
+  contextMenuEl.hidden = false;
+}
+
+document.addEventListener('click', hideContextMenu);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
+
+async function playLibraryEntry(entry) {
+  try {
+    const ready = await libraryManager.playWhenReady(entry.hash);
+    currentPlayingHash = ready.hash;
+    setCurrentPlayingHash(ready.hash);
+    await fileAudioSource.loadFile(ready.filePath, null);
+    fileAudioSource.play();
+    fileSeek.max = fileAudioSource.getDuration();
+    fileTransport.hidden = false;
+    stemMixer.hidden = false;
+    updatePlayPauseIcon();
+  } catch (err) {
+    console.error(`Failed to play "${entry.title}":`, err);
+    fileError.hidden = false;
+    fileError.textContent = `Failed to play "${entry.title}": ${err.message || err}`;
+  }
+}
 
 function renderLibraryRows() {
   const filtered = filterEntries(libraryManager.entries, {
@@ -104,6 +266,7 @@ function renderLibraryRows() {
     genre: libraryGenreFilter.value
   });
   const sorted = sortEntries(filtered, sortField, sortDirection);
+  lastSortedEntries = sorted;
 
   const genres = [...new Set(libraryManager.entries.map((e) => e.genre).filter(Boolean))].sort();
   const currentGenreValue = libraryGenreFilter.value;
@@ -161,48 +324,26 @@ function renderLibraryRows() {
     favoriteCell.textContent = entry.favorite ? '★' : '☆';
 
     const actionsCell = document.createElement('td');
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'library-remove-btn';
-    removeBtn.title = 'Remove from library';
-    removeBtn.textContent = '✕';
-    const statusSpan = document.createElement('span');
-    statusSpan.className = 'library-status-icon';
-    statusSpan.textContent = statusIcon;
-    actionsCell.appendChild(removeBtn);
-    actionsCell.appendChild(document.createTextNode(' '));
-    actionsCell.appendChild(statusSpan);
+    actionsCell.className = 'library-status-icon';
+    actionsCell.textContent = statusIcon;
 
     row.append(titleCell, artistCell, albumCell, genreCell, durationCell, playCountCell, addedCell, lastPlayedCell, favoriteCell, actionsCell);
 
-    titleCell.addEventListener('click', async () => {
-      // fileSeek/fileTransport/stemMixer are the same consts already declared
-      // earlier in this file by the prior feature's panel.js wiring.
-      try {
-        const ready = await libraryManager.playWhenReady(entry.hash);
-        setCurrentPlayingHash(ready.hash);
-        await fileAudioSource.loadFile(ready.filePath, null);
-        fileAudioSource.play();
-        fileSeek.max = fileAudioSource.getDuration();
-        fileTransport.hidden = false;
-        stemMixer.hidden = false;
-      } catch (err) {
-        console.error(`Failed to play "${entry.title}":`, err);
-        fileError.hidden = false;
-        fileError.textContent = `Failed to play "${entry.title}": ${err.message || err}`;
-      }
+    titleCell.addEventListener('click', () => playLibraryEntry(entry));
+
+    // Right-click anywhere on the row opens Play/Delete/Genre — replaces the
+    // old always-visible ✕ button.
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showLibraryContextMenu(e.clientX, e.clientY, entry);
     });
 
-    // Both setFavorite and removeEntry already trigger onLibraryChanged
-    // internally (wired to renderLibraryRows below) -- no need to also
-    // re-render here, that would just render twice per click.
+    // setFavorite already triggers onLibraryChanged internally (wired to
+    // renderLibraryRows below) -- no need to also re-render here, that would
+    // just render twice per click.
     favoriteCell.addEventListener('click', (e) => {
       e.stopPropagation();
       libraryManager.setFavorite(entry.hash, !entry.favorite);
-    });
-
-    removeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      libraryManager.removeEntry(entry.hash);
     });
 
     libraryRows.appendChild(row);
@@ -221,6 +362,8 @@ for (const th of document.querySelectorAll('#library-table th[data-sort-field]')
     renderLibraryRows();
   });
 }
+
+setupColumnResize();
 
 librarySearch.addEventListener('input', renderLibraryRows);
 libraryGenreFilter.addEventListener('change', renderLibraryRows);
@@ -315,14 +458,12 @@ loadFileBtn.addEventListener('click', async () => {
     if (!entry) throw new Error('Failed to add file to library');
     renderLibraryRows();
 
-    const ready = await libraryManager.playWhenReady(entry.hash);
-    setCurrentPlayingHash(ready.hash);
-    await fileAudioSource.loadFile(ready.filePath, null);
-    fileAudioSource.play();
-
-    fileTransport.hidden = false;
-    stemMixer.hidden = false;
-    fileSeek.max = fileAudioSource.getDuration();
+    // playLibraryEntry handles playWhenReady + setCurrentPlayingHash +
+    // loadFile + play + unhiding the transport/mixer + the play/pause icon,
+    // same as clicking a row in the table -- reused here so both paths stay
+    // in sync (e.g. for Previous/Next to work correctly regardless of how
+    // the current song was loaded).
+    await playLibraryEntry(entry);
     await refreshCacheSize();
     renderLibraryRows();
   } catch (err) {
@@ -334,31 +475,80 @@ loadFileBtn.addEventListener('click', async () => {
   }
 });
 
-filePlayBtn.addEventListener('click', () => fileAudioSource.play());
-filePauseBtn.addEventListener('click', () => fileAudioSource.pause());
+function updatePlayPauseIcon() {
+  const playing = fileAudioSource.isPlaying;
+  filePlayPauseBtn.textContent = playing ? '⏸' : '▶';
+  filePlayPauseBtn.title = playing ? 'Pause' : 'Play';
+}
+
+filePlayPauseBtn.addEventListener('click', () => {
+  if (fileAudioSource.isPlaying) {
+    fileAudioSource.pause();
+  } else {
+    fileAudioSource.play();
+  }
+  updatePlayPauseIcon();
+});
+
+function skipBy(delta) {
+  if (!currentPlayingHash || lastSortedEntries.length === 0) return;
+  const idx = lastSortedEntries.findIndex((e) => e.hash === currentPlayingHash);
+  if (idx === -1) return;
+  const nextIdx = (idx + delta + lastSortedEntries.length) % lastSortedEntries.length;
+  playLibraryEntry(lastSortedEntries[nextIdx]);
+}
+
+filePrevBtn.addEventListener('click', () => skipBy(-1));
+fileNextBtn.addEventListener('click', () => skipBy(1));
+
 fileSeek.addEventListener('input', (e) => fileAudioSource.seek(Number(e.target.value)));
+
+// Catches "track ended naturally" (fileAudioSource pauses itself internally
+// when playback reaches the end) -- a plain click handler can't see that,
+// since nothing else calls back into panel.js when it happens.
+setInterval(updatePlayPauseIcon, 500);
+
+// A single shared "which stem is soloed" value, not one boolean per button --
+// the old per-button closures each tracked their own local `soloed` flag, so
+// soloing stem B while stem A was already soloed left A's own button still
+// thinking it was active, making a second click on A incorrectly clear solo
+// entirely instead of re-soloing A.
+let soloedStem = null;
 
 for (const row of stemMixer.querySelectorAll('.stem-row')) {
   const stemName = row.dataset.stem;
-  const muteBox = row.querySelector('.stem-mute');
+  const enabledBox = row.querySelector('.stem-enabled');
   const volumeSlider = row.querySelector('.stem-volume');
+  const volumeVal = row.querySelector('.stem-volume-val');
   const soloBtn = row.querySelector('.stem-solo');
 
-  muteBox.addEventListener('change', (e) => fileAudioSource.setStemMute(stemName, e.target.checked));
-  volumeSlider.addEventListener('input', (e) => fileAudioSource.setStemVolume(stemName, Number(e.target.value)));
+  // The toggle reads as "on" when checked (the intuitive direction) --
+  // fileAudioSource's API is mute-based, so invert here at the boundary.
+  enabledBox.addEventListener('change', (e) => {
+    fileAudioSource.setStemMute(stemName, !e.target.checked);
+  });
 
-  let soloed = false;
+  volumeSlider.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    fileAudioSource.setStemVolume(stemName, val);
+    volumeVal.textContent = `${Math.round(val * 100)}%`;
+  });
+
   soloBtn.addEventListener('click', () => {
-    soloed = !soloed;
-    if (soloed) {
-      fileAudioSource.soloStem(stemName);
+    if (soloedStem === stemName) {
+      fileAudioSource.clearSolo();
+      soloedStem = null;
       for (const otherRow of stemMixer.querySelectorAll('.stem-row')) {
-        otherRow.querySelector('.stem-mute').checked = otherRow.dataset.stem !== stemName;
+        otherRow.querySelector('.stem-enabled').checked = true;
+        otherRow.querySelector('.stem-solo').classList.remove('active');
       }
     } else {
-      fileAudioSource.clearSolo();
+      fileAudioSource.soloStem(stemName);
+      soloedStem = stemName;
       for (const otherRow of stemMixer.querySelectorAll('.stem-row')) {
-        otherRow.querySelector('.stem-mute').checked = false;
+        const isThisOne = otherRow.dataset.stem === stemName;
+        otherRow.querySelector('.stem-enabled').checked = isThisOne;
+        otherRow.querySelector('.stem-solo').classList.toggle('active', isThisOne);
       }
     }
   });
@@ -391,6 +581,8 @@ async function loadSettings() {
     document.getElementById('barcount-val').textContent = saved.barCount;
     document.getElementById('bg-select').value = saved.background;
     document.getElementById('beat-flash').checked = saved.beatFlash;
+    applyPanelWidth(saved.panelWidth || 250);
+    applyColumnWidths(saved.libraryColumnWidths);
   }
 }
 loadSettings();

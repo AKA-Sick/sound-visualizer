@@ -48,6 +48,8 @@ body.transparent { background: transparent; }
 
 #panel {
   width: 250px;
+  min-width: 180px;
+  max-width: 70vw;
   background: rgba(20, 20, 20, 0.95);
   border-right: 1px solid #222;
   padding: 20px;
@@ -56,11 +58,35 @@ body.transparent { background: transparent; }
   height: 100%;
   z-index: 10;
   overflow-y: auto;
-  transform: translateX(-250px);
+  /* Percentage (not a fixed px) so hiding still works correctly once the
+     panel's width has been changed by the resize handle below. */
+  transform: translateX(-100%);
   transition: transform 0.3s ease;
 }
 
 #panel.open { transform: translateX(0); }
+
+#panel-resize-handle {
+  position: fixed;
+  top: 0;
+  left: 250px;
+  width: 6px;
+  height: 100%;
+  z-index: 11;
+  cursor: ew-resize;
+  display: none;
+}
+
+#panel.open ~ #panel-resize-handle {
+  display: block;
+}
+
+#panel-resize-handle:hover,
+#panel-resize-handle.dragging {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+body.transparent #panel-resize-handle { display: none; }
 
 .panel-section { margin-bottom: 20px; }
 
@@ -104,15 +130,126 @@ select {
   align-items: center; font-size: 13px; color: #aaa;
 }
 
+#stem-mixer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#stem-mixer .stem-header {
+  display: grid;
+  grid-template-columns: 52px 34px 1fr 26px;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.68em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+  padding: 0 2px 2px;
+}
+
 #file-controls #stem-mixer .stem-row {
+  display: grid;
+  grid-template-columns: 52px 34px 1fr 26px;
+  gap: 10px;
+  align-items: center;
+}
+
+.stem-label {
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Toggle switch (replaces a bare checkbox, which read as ambiguous --
+   "checked" now means "this stem is audible", the intuitive direction,
+   rather than the old inverted "checked = muted" behavior). */
+.stem-toggle {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.stem-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.stem-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.stem-toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 2px;
+  top: 2px;
+  background: #ccc;
+  border-radius: 50%;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.stem-toggle input:checked + .stem-toggle-track {
+  background: #4a9eff;
+}
+
+.stem-toggle input:checked + .stem-toggle-track::before {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.stem-volume-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
 }
 
-#file-controls #stem-mixer .stem-row label {
-  width: 60px;
+.stem-volume {
+  flex: 1;
+  accent-color: #4a9eff;
+}
+
+.stem-volume-val {
+  font-size: 0.75em;
+  opacity: 0.7;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.stem-solo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #333;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.stem-solo:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.stem-solo.active {
+  background: #ffb020;
+  border-color: #ffb020;
+  color: #000;
 }
 
 #cache-info {
@@ -138,18 +275,41 @@ select {
 #library-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.85em;
 }
 
 #library-table th {
+  position: relative;
   cursor: pointer;
   text-align: left;
   padding: 4px 8px;
   user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #library-table td {
   padding: 4px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.column-resize-handle:hover,
+.column-resize-handle.dragging {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 #library-table tbody tr:hover {
@@ -164,4 +324,97 @@ select {
   font-size: 0.85em;
   opacity: 0.8;
   margin-top: 8px;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 160px;
+  background: rgba(25, 25, 25, 0.98);
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 4px 0;
+  z-index: 50;
+  font-size: 0.85em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.context-menu-item {
+  position: relative;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.context-menu-item.has-submenu::after {
+  content: '▸';
+  opacity: 0.6;
+}
+
+.context-menu-submenu {
+  display: none;
+  position: absolute;
+  top: -5px;
+  left: 100%;
+}
+
+.context-menu-item.has-submenu:hover > .context-menu-submenu {
+  display: block;
+}
+
+#file-seek {
+  width: 100%;
+  accent-color: #4a9eff;
+}
+
+#transport-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.transport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #333;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.transport-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.transport-btn:active {
+  transform: scale(0.92);
+}
+
+.transport-btn-main {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  background: #4a9eff;
+  border-color: #4a9eff;
+}
+
+.transport-btn-main:hover {
+  background: #6bb0ff;
 }

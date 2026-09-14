@@ -67,46 +67,91 @@
     </div>
     <div id="file-error" hidden></div>
     <div id="file-transport" hidden>
-      <button id="file-play-btn">Play</button>
-      <button id="file-pause-btn">Pause</button>
       <input type="range" id="file-seek" min="0" max="100" step="0.1" value="0">
+      <div id="transport-controls">
+        <button id="file-prev-btn" class="transport-btn" title="Previous">⏮</button>
+        <button id="file-playpause-btn" class="transport-btn transport-btn-main" title="Play">▶</button>
+        <button id="file-next-btn" class="transport-btn" title="Next">⏭</button>
+      </div>
     </div>
     <div id="stem-mixer" hidden>
+      <div class="stem-header">
+        <span></span>
+        <span title="On/off">On</span>
+        <span title="Volume">Volume</span>
+        <span title="Solo">Solo</span>
+      </div>
       <div class="stem-row" data-stem="vocals">
-        <label>Vocals</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Vocals</span>
+        <label class="stem-toggle" title="Toggle Vocals on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Vocals">S</button>
       </div>
       <div class="stem-row" data-stem="drums">
-        <label>Drums</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Drums</span>
+        <label class="stem-toggle" title="Toggle Drums on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Drums">S</button>
       </div>
       <div class="stem-row" data-stem="bass">
-        <label>Bass</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Bass</span>
+        <label class="stem-toggle" title="Toggle Bass on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Bass">S</button>
       </div>
       <div class="stem-row" data-stem="guitar">
-        <label>Guitar</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Guitar</span>
+        <label class="stem-toggle" title="Toggle Guitar on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Guitar">S</button>
       </div>
       <div class="stem-row" data-stem="piano">
-        <label>Piano</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Piano</span>
+        <label class="stem-toggle" title="Toggle Piano on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Piano">S</button>
       </div>
       <div class="stem-row" data-stem="other">
-        <label>Other</label>
-        <input type="checkbox" class="stem-mute">
-        <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
-        <button class="stem-solo">Solo</button>
+        <span class="stem-label">Other</span>
+        <label class="stem-toggle" title="Toggle Other on/off">
+          <input type="checkbox" class="stem-enabled" checked>
+          <span class="stem-toggle-track"></span>
+        </label>
+        <span class="stem-volume-wrap">
+          <input type="range" class="stem-volume" min="0" max="1" step="0.01" value="1">
+          <span class="stem-volume-val">100%</span>
+        </span>
+        <button class="stem-solo" title="Solo Other">S</button>
       </div>
     </div>
     <div id="cache-info">
@@ -194,10 +239,12 @@
     </select>
   </div>
 </div>
+    <div id="panel-resize-handle"></div>
     <div id="canvas-container">
       <canvas id="visualizer"></canvas>
     </div>
   </div>
+  <div id="library-context-menu" class="context-menu" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

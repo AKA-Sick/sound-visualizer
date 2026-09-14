@@ -198,6 +198,10 @@ function createWindow() {
     return libraryStore.setFavorite(app.getPath('userData'), hash, favorite);
   });
 
+  ipcMain.handle('set-genre', async (_event, hash, genre) => {
+    return libraryStore.setGenre(app.getPath('userData'), hash, genre);
+  });
+
   ipcMain.handle('remove-library-entry', async (_event, hash) => {
     libraryStore.removeEntry(app.getPath('userData'), hash);
   });

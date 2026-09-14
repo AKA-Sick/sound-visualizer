@@ -54,6 +54,10 @@ function setFavorite(userDataPath, hash, favorite) {
   return upsertEntry(userDataPath, hash, { favorite });
 }
 
+function setGenre(userDataPath, hash, genre) {
+  return upsertEntry(userDataPath, hash, { genre });
+}
+
 function recordPlay(userDataPath, hash) {
   const existing = loadLibrary(userDataPath).find((e) => e.hash === hash);
   const playCount = (existing?.playCount || 0) + 1;
@@ -72,5 +76,5 @@ function resetAllProcessed(userDataPath) {
 
 module.exports = {
   getLibraryPath, loadLibrary, saveLibrary, upsertEntry, removeEntry,
-  setFavorite, recordPlay, markProcessed, resetAllProcessed
+  setFavorite, setGenre, recordPlay, markProcessed, resetAllProcessed
 };

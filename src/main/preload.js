@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLibrary: () => ipcRenderer.invoke('get-library'),
   addSingleFileToLibrary: (filePath) => ipcRenderer.invoke('add-single-file-to-library', filePath),
   setFavorite: (hash, favorite) => ipcRenderer.invoke('set-favorite', hash, favorite),
+  setGenre: (hash, genre) => ipcRenderer.invoke('set-genre', hash, genre),
   removeLibraryEntry: (hash) => ipcRenderer.invoke('remove-library-entry', hash),
   recordPlay: (hash) => ipcRenderer.invoke('record-play', hash),
   markLibraryProcessed: (hash, duration) => ipcRenderer.invoke('mark-library-processed', hash, duration),

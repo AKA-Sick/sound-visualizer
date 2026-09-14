@@ -9,7 +9,9 @@ const DEFAULTS = {
   barCount: 64,
   background: 'solid',
   beatFlash: false,
-  source: 'live'
+  source: 'live',
+  panelWidth: 250,
+  libraryColumnWidths: {}
 };
 
 class SettingsStore {
