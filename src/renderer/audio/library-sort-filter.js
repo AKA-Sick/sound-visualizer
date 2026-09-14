@@ -4,6 +4,7 @@ function compareEntries(a, b, field, direction) {
     case 'title':
     case 'artist':
     case 'album':
+    case 'genre':
       result = a[field].localeCompare(b[field]);
       break;
     case 'dateAdded':

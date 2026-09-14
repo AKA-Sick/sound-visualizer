@@ -107,10 +107,18 @@ function renderLibraryRows() {
 
   const genres = [...new Set(libraryManager.entries.map((e) => e.genre).filter(Boolean))].sort();
   const currentGenreValue = libraryGenreFilter.value;
-  libraryGenreFilter.innerHTML = '<option value="">All Genres</option>' +
-    genres.map((g) => `<option value="${g}">${g}</option>`).join('');
+  libraryGenreFilter.innerHTML = '';
+  libraryGenreFilter.appendChild(new Option('All Genres', ''));
+  for (const g of genres) libraryGenreFilter.appendChild(new Option(g, g));
   libraryGenreFilter.value = currentGenreValue;
 
+  // Rows are built via document.createElement/textContent rather than an
+  // innerHTML template string -- title/artist/album/genre come from embedded
+  // file tags (ID3/Vorbis/MP4), i.e. third-party content from whatever files
+  // "Load Folder..." is pointed at. Interpolating that untrusted text into
+  // .innerHTML would let a maliciously-tagged file inject a script with full
+  // access to window.electronAPI (arbitrary file reads, cache clearing,
+  // etc.); textContent renders it as inert literal text instead.
   libraryRows.innerHTML = '';
   for (const entry of sorted) {
     const row = document.createElement('tr');
@@ -119,39 +127,80 @@ function renderLibraryRows() {
     const statusIcon = entry.error ? '⚠' : entry.processed ? '✓' : '⏳';
     const minutes = Math.floor(entry.duration / 60);
     const seconds = Math.floor(entry.duration % 60).toString().padStart(2, '0');
+    const addedStr = entry.dateAdded ? new Date(entry.dateAdded).toLocaleDateString() : '';
+    const lastPlayedStr = entry.lastPlayed ? new Date(entry.lastPlayed).toLocaleDateString() : 'Never';
 
-    row.innerHTML = `
-      <td class="library-title-cell">${entry.title}</td>
-      <td>${entry.artist}</td>
-      <td>${entry.album}</td>
-      <td>${entry.genre}</td>
-      <td>${minutes}:${seconds}</td>
-      <td>${entry.playCount}</td>
-      <td class="library-favorite-cell">${entry.favorite ? '★' : '☆'}</td>
-      <td><button class="library-remove-btn" title="Remove from library">✕</button> <span class="library-status-icon">${statusIcon}</span></td>
-    `;
+    const titleCell = document.createElement('td');
+    titleCell.className = 'library-title-cell';
+    titleCell.textContent = entry.title;
+    titleCell.style.cursor = 'pointer';
 
-    row.querySelector('.library-title-cell').addEventListener('click', async () => {
+    const artistCell = document.createElement('td');
+    artistCell.textContent = entry.artist;
+
+    const albumCell = document.createElement('td');
+    albumCell.textContent = entry.album;
+
+    const genreCell = document.createElement('td');
+    genreCell.textContent = entry.genre;
+
+    const durationCell = document.createElement('td');
+    durationCell.textContent = `${minutes}:${seconds}`;
+
+    const playCountCell = document.createElement('td');
+    playCountCell.textContent = String(entry.playCount);
+
+    const addedCell = document.createElement('td');
+    addedCell.textContent = addedStr;
+
+    const lastPlayedCell = document.createElement('td');
+    lastPlayedCell.textContent = lastPlayedStr;
+
+    const favoriteCell = document.createElement('td');
+    favoriteCell.className = 'library-favorite-cell';
+    favoriteCell.textContent = entry.favorite ? '★' : '☆';
+
+    const actionsCell = document.createElement('td');
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'library-remove-btn';
+    removeBtn.title = 'Remove from library';
+    removeBtn.textContent = '✕';
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'library-status-icon';
+    statusSpan.textContent = statusIcon;
+    actionsCell.appendChild(removeBtn);
+    actionsCell.appendChild(document.createTextNode(' '));
+    actionsCell.appendChild(statusSpan);
+
+    row.append(titleCell, artistCell, albumCell, genreCell, durationCell, playCountCell, addedCell, lastPlayedCell, favoriteCell, actionsCell);
+
+    titleCell.addEventListener('click', async () => {
       // fileSeek/fileTransport/stemMixer are the same consts already declared
       // earlier in this file by the prior feature's panel.js wiring.
-      const ready = await libraryManager.playWhenReady(entry.hash);
-      setCurrentPlayingHash(ready.hash);
-      await fileAudioSource.loadFile(ready.filePath, null);
-      fileAudioSource.play();
-      fileSeek.max = fileAudioSource.getDuration();
-      fileTransport.hidden = false;
-      stemMixer.hidden = false;
+      try {
+        const ready = await libraryManager.playWhenReady(entry.hash);
+        setCurrentPlayingHash(ready.hash);
+        await fileAudioSource.loadFile(ready.filePath, null);
+        fileAudioSource.play();
+        fileSeek.max = fileAudioSource.getDuration();
+        fileTransport.hidden = false;
+        stemMixer.hidden = false;
+      } catch (err) {
+        console.error(`Failed to play "${entry.title}":`, err);
+        fileError.hidden = false;
+        fileError.textContent = `Failed to play "${entry.title}": ${err.message || err}`;
+      }
     });
 
     // Both setFavorite and removeEntry already trigger onLibraryChanged
     // internally (wired to renderLibraryRows below) -- no need to also
     // re-render here, that would just render twice per click.
-    row.querySelector('.library-favorite-cell').addEventListener('click', (e) => {
+    favoriteCell.addEventListener('click', (e) => {
       e.stopPropagation();
       libraryManager.setFavorite(entry.hash, !entry.favorite);
     });
 
-    row.querySelector('.library-remove-btn').addEventListener('click', (e) => {
+    removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       libraryManager.removeEntry(entry.hash);
     });

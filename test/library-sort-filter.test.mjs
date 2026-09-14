@@ -19,6 +19,11 @@ describe('sortEntries', () => {
     assert.deepEqual(sorted.map((e) => e.title), ['Gamma', 'Beta', 'Alpha']);
   });
 
+  it('sorts by genre ascending', () => {
+    const sorted = sortEntries(sample, 'genre', 'asc');
+    assert.deepEqual(sorted.map((e) => e.genre), ['Pop', 'Rock', 'Rock']);
+  });
+
   it('sorts by playCount ascending', () => {
     const sorted = sortEntries(sample, 'playCount', 'asc');
     assert.deepEqual(sorted.map((e) => e.hash), ['3', '1', '2']);
