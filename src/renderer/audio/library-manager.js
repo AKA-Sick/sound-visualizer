@@ -15,6 +15,10 @@ export class LibraryManager {
   async loadLibrary() {
     this.entries = await window.electronAPI.getLibrary();
     this.onLibraryChanged(this.entries);
+    for (const entry of this.entries) {
+      if (!entry.processed) this.queue.enqueue(entry.hash);
+    }
+    this._runQueue();
   }
 
   async addFolder(folderPath) {
