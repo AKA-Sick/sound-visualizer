@@ -130,6 +130,11 @@ select {
   margin-top: 8px;
 }
 
+#library-list-section {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 #library-table {
   width: 100%;
   border-collapse: collapse;
