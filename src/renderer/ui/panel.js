@@ -254,37 +254,30 @@ loadFileBtn.addEventListener('click', async () => {
     fileError.textContent = '';
     fileTransport.hidden = true;
     stemMixer.hidden = true;
-    fileProgress.hidden = false;
-    // First use may need to download the ~258MB separation model, which can
-    // take several minutes with no per-byte progress available yet — show a
-    // reassuring static message instead of leaving the user on "Checking
-    // cache…" indistinguishable from a hang. Real progress (below) overwrites
-    // this as soon as separation actually starts reporting percentages.
-    fileProgressLabel.textContent = 'Checking cache… (first use downloads a ~258MB model — this may take several minutes)';
-    fileProgressBar.value = 0;
 
-    await fileAudioSource.loadFile(filePath, (percent) => {
-      fileProgressLabel.textContent = `Separating stems… ${Math.round(percent * 100)}%`;
-      fileProgressBar.value = percent * 100;
-    });
+    // Routed through libraryManager (the same queue folder-loaded songs use)
+    // instead of calling fileAudioSource.loadFile() directly, so a full ONNX
+    // separation triggered here can never run concurrently with one already
+    // in flight from a background folder scan. Progress for this load now
+    // surfaces via the shared queue-status line (see libraryManager.onQueueProgress
+    // wiring below) instead of the fileProgress/fileProgressLabel/fileProgressBar
+    // elements, which are no longer used by this handler.
+    const entry = await libraryManager.addFile(filePath);
+    if (!entry) throw new Error('Failed to add file to library');
+    renderLibraryRows();
 
-    fileProgress.hidden = true;
+    const ready = await libraryManager.playWhenReady(entry.hash);
+    setCurrentPlayingHash(ready.hash);
+    await fileAudioSource.loadFile(ready.filePath, null);
+    fileAudioSource.play();
+
     fileTransport.hidden = false;
     stemMixer.hidden = false;
     fileSeek.max = fileAudioSource.getDuration();
     await refreshCacheSize();
-
-    // Register this file with the library too, so it shows up as a row
-    // (same small redundant re-hash tradeoff as LibraryManager's own
-    // checkStemCache reuse — see Task 9's note).
-    const { hash } = await window.electronAPI.checkStemCache(filePath);
-    setCurrentPlayingHash(hash);
-    const entries = await window.electronAPI.addSingleFileToLibrary(filePath);
-    libraryManager.entries = entries;
     renderLibraryRows();
   } catch (err) {
     console.error('Failed to load/process audio file:', err);
-    fileProgress.hidden = true;
     fileError.hidden = false;
     fileError.textContent = `Failed to process file: ${err.message || err}`;
   } finally {

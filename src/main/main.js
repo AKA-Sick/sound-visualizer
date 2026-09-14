@@ -60,7 +60,15 @@ function createWindow() {
     return new Uint8Array(fs.readFileSync(filePath));
   });
 
-  ipcMain.handle('process-audio-pcm', async (event, { hash, dir, left, right, sampleRate }) => {
+  // Serializes every process-audio-pcm call through a single promise chain so
+  // two full ONNX separations can never run concurrently, no matter which
+  // renderer-side code path (single-file load or the library queue) invoked
+  // this handler -- the plan's "never run two separations in parallel,
+  // anywhere in the app" constraint enforced at the one chokepoint every
+  // code path must pass through. The handler body itself (extracted verbatim
+  // into processAudioPcmHandler below) is completely unchanged.
+  let processingChain = Promise.resolve();
+  const processAudioPcmHandler = async (event, { hash, dir, left, right, sampleRate }) => {
     let session = await stemModel.loadSession(app.getPath('userData'));
     let cpuFallbackAttempted = false;
 
@@ -119,6 +127,11 @@ function createWindow() {
     });
 
     return { dir };
+  };
+  ipcMain.handle('process-audio-pcm', (event, payload) => {
+    const run = processingChain.then(() => processAudioPcmHandler(event, payload));
+    processingChain = run.catch(() => {}); // keep the chain alive even if one call rejects
+    return run;
   });
 
   ipcMain.handle('read-stem-audio', async (_event, dir) => {
