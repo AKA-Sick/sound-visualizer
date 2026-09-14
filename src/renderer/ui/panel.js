@@ -1,5 +1,7 @@
 import { setVisualizer, updateSettings, settings } from '../app.js';
 import { fileAudioSource, setSourceMode } from '../app.js';
+import { libraryManager, setCurrentPlayingHash } from '../app.js';
+import { sortEntries, filterEntries } from '../audio/library-sort-filter.js';
 
 const panel = document.getElementById('panel');
 const menuBtn = document.getElementById('menu-btn');
@@ -82,6 +84,150 @@ const stemMixer = document.getElementById('stem-mixer');
 const cacheSizeLabel = document.getElementById('cache-size-label');
 const clearCacheBtn = document.getElementById('clear-cache-btn');
 
+// loadFileBtn is already declared above (prior feature's Task 10) --
+// do not redeclare it here, panel.js is a single module scope. Just reuse it below.
+const loadFolderBtn = document.getElementById('load-folder-btn');
+const librarySearch = document.getElementById('library-search');
+const libraryGenreFilter = document.getElementById('library-genre-filter');
+const libraryFavoritesOnly = document.getElementById('library-favorites-only');
+const libraryRows = document.getElementById('library-rows');
+const queueStatus = document.getElementById('queue-status');
+const queueStatusLabel = document.getElementById('queue-status-label');
+
+let sortField = 'title';
+let sortDirection = 'asc';
+
+function renderLibraryRows() {
+  const filtered = filterEntries(libraryManager.entries, {
+    searchText: librarySearch.value,
+    favoritesOnly: libraryFavoritesOnly.checked,
+    genre: libraryGenreFilter.value
+  });
+  const sorted = sortEntries(filtered, sortField, sortDirection);
+
+  const genres = [...new Set(libraryManager.entries.map((e) => e.genre).filter(Boolean))].sort();
+  const currentGenreValue = libraryGenreFilter.value;
+  libraryGenreFilter.innerHTML = '<option value="">All Genres</option>' +
+    genres.map((g) => `<option value="${g}">${g}</option>`).join('');
+  libraryGenreFilter.value = currentGenreValue;
+
+  libraryRows.innerHTML = '';
+  for (const entry of sorted) {
+    const row = document.createElement('tr');
+    row.dataset.hash = entry.hash;
+
+    const statusIcon = entry.error ? '⚠' : entry.processed ? '✓' : '⏳';
+    const minutes = Math.floor(entry.duration / 60);
+    const seconds = Math.floor(entry.duration % 60).toString().padStart(2, '0');
+
+    row.innerHTML = `
+      <td class="library-title-cell">${entry.title}</td>
+      <td>${entry.artist}</td>
+      <td>${entry.album}</td>
+      <td>${entry.genre}</td>
+      <td>${minutes}:${seconds}</td>
+      <td>${entry.playCount}</td>
+      <td class="library-favorite-cell">${entry.favorite ? '★' : '☆'}</td>
+      <td><button class="library-remove-btn" title="Remove from library">✕</button> <span class="library-status-icon">${statusIcon}</span></td>
+    `;
+
+    row.querySelector('.library-title-cell').addEventListener('click', async () => {
+      // fileSeek/fileTransport/stemMixer are the same consts already declared
+      // earlier in this file by the prior feature's panel.js wiring.
+      const ready = await libraryManager.playWhenReady(entry.hash);
+      setCurrentPlayingHash(ready.hash);
+      await fileAudioSource.loadFile(ready.filePath, null);
+      fileAudioSource.play();
+      fileSeek.max = fileAudioSource.getDuration();
+      fileTransport.hidden = false;
+      stemMixer.hidden = false;
+    });
+
+    // Both setFavorite and removeEntry already trigger onLibraryChanged
+    // internally (wired to renderLibraryRows below) -- no need to also
+    // re-render here, that would just render twice per click.
+    row.querySelector('.library-favorite-cell').addEventListener('click', (e) => {
+      e.stopPropagation();
+      libraryManager.setFavorite(entry.hash, !entry.favorite);
+    });
+
+    row.querySelector('.library-remove-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      libraryManager.removeEntry(entry.hash);
+    });
+
+    libraryRows.appendChild(row);
+  }
+}
+
+for (const th of document.querySelectorAll('#library-table th[data-sort-field]')) {
+  th.addEventListener('click', () => {
+    const field = th.dataset.sortField;
+    if (sortField === field) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortDirection = 'asc';
+    }
+    renderLibraryRows();
+  });
+}
+
+librarySearch.addEventListener('input', renderLibraryRows);
+libraryGenreFilter.addEventListener('change', renderLibraryRows);
+libraryFavoritesOnly.addEventListener('change', renderLibraryRows);
+
+loadFolderBtn.addEventListener('click', async () => {
+  const folderPath = await window.electronAPI.pickFolder();
+  if (!folderPath) return;
+
+  // Same busy-guard pattern as loadFileBtn -- prevents a double-click from
+  // re-scanning (re-hashing/re-tagging every file) while a scan is already
+  // running. The actual processing queue is separately protected against
+  // concurrent draining by LibraryManager's own `this.processing` flag.
+  loadFolderBtn.disabled = true;
+  try {
+    await libraryManager.addFolder(folderPath);
+    renderLibraryRows();
+  } finally {
+    loadFolderBtn.disabled = false;
+  }
+});
+
+window.electronAPI.onFolderScanProgress(({ current, total, fileName }) => {
+  queueStatus.hidden = false;
+  queueStatusLabel.textContent = `Scanning folder… ${current}/${total}: ${fileName}`;
+});
+
+// Deferred via queueMicrotask: app.js (the entry module) imports panel.js
+// (for togglePanel) *before* app.js's own top-level code reaches
+// `export const libraryManager = new LibraryManager(...)`. Because of that
+// circular import, touching `libraryManager` synchronously here at
+// panel.js's module top level -- while app.js is still mid-evaluation --
+// throws "Cannot access 'libraryManager' before initialization" (TDZ) and
+// aborts the whole module graph. Static ES module evaluation (no top-level
+// await anywhere in this graph) runs as a single synchronous job, so a
+// microtask queued here is guaranteed to run only after that entire job
+// -- including the rest of app.js -- has finished, by which point
+// `libraryManager` is fully initialized.
+queueMicrotask(() => {
+  const originalLibraryManagerOnLibraryChanged = libraryManager.onLibraryChanged;
+  libraryManager.onLibraryChanged = (entries) => {
+    originalLibraryManagerOnLibraryChanged(entries);
+    renderLibraryRows();
+  };
+
+  libraryManager.onQueueProgress = ({ hash, title, queueTotal, percent }) => {
+    queueStatus.hidden = false;
+    queueStatusLabel.textContent = `Processing "${title}" (${queueTotal} remaining) — ${Math.round(percent * 100)}%`;
+    if (percent >= 1) {
+      setTimeout(() => { if (libraryManager.queue.isEmpty) queueStatus.hidden = true; }, 500);
+    }
+  };
+
+  libraryManager.loadLibrary();
+});
+
 function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -127,6 +273,15 @@ loadFileBtn.addEventListener('click', async () => {
     stemMixer.hidden = false;
     fileSeek.max = fileAudioSource.getDuration();
     await refreshCacheSize();
+
+    // Register this file with the library too, so it shows up as a row
+    // (same small redundant re-hash tradeoff as LibraryManager's own
+    // checkStemCache reuse — see Task 9's note).
+    const { hash } = await window.electronAPI.checkStemCache(filePath);
+    setCurrentPlayingHash(hash);
+    const entries = await window.electronAPI.addSingleFileToLibrary(filePath);
+    libraryManager.entries = entries;
+    renderLibraryRows();
   } catch (err) {
     console.error('Failed to load/process audio file:', err);
     fileProgress.hidden = true;

@@ -26,8 +26,39 @@
     </select>
   </div>
 
-  <div class="panel-section" id="file-controls" hidden>
+  <div class="panel-section" id="library-controls">
     <button id="load-file-btn">Load File…</button>
+    <button id="load-folder-btn">Load Folder…</button>
+    <input type="text" id="library-search" placeholder="Search title, artist, album…">
+    <select id="library-genre-filter">
+      <option value="">All Genres</option>
+    </select>
+    <label><input type="checkbox" id="library-favorites-only"> Favorites only</label>
+  </div>
+
+  <div class="panel-section" id="library-list-section">
+    <table id="library-table">
+      <thead>
+        <tr>
+          <th data-sort-field="title">Title</th>
+          <th data-sort-field="artist">Artist</th>
+          <th data-sort-field="album">Album</th>
+          <th data-sort-field="genre">Genre</th>
+          <th data-sort-field="duration">Duration</th>
+          <th data-sort-field="playCount">Plays</th>
+          <th>★</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="library-rows"></tbody>
+    </table>
+  </div>
+
+  <div class="panel-section" id="queue-status" hidden>
+    <span id="queue-status-label"></span>
+  </div>
+
+  <div class="panel-section" id="file-controls" hidden>
     <div id="file-progress" hidden>
       <span id="file-progress-label">Separating stems… 0%</span>
       <progress id="file-progress-bar" max="100" value="0"></progress>
