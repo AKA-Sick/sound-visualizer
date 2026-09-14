@@ -1497,7 +1497,15 @@ libraryManager.onQueueProgress = ({ hash, title, queueTotal, percent }) => {
   }
 };
 
-libraryManager.loadLibrary();
+// app.js and panel.js import each other (a pre-existing circular import from
+// the file-playback feature). app.js's `import './ui/panel.js'` (or
+// equivalent) runs panel.js's top-level code BEFORE app.js reaches its own
+// `const libraryManager = new LibraryManager(...)` declaration further down
+// the file -- calling libraryManager synchronously here at module-evaluation
+// time hits it in its temporal dead zone and throws. Defer to a microtask so
+// this runs after the whole synchronous module-evaluation chain (including
+// app.js's own declarations) has completed.
+queueMicrotask(() => { libraryManager.loadLibrary(); });
 ```
 
 The existing `loadFileBtn` click handler (from the prior feature) currently reads exactly as follows — find this block in `panel.js`:
